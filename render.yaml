@@ -1,0 +1,33 @@
+# Render Blueprint — New → Blueprint → pick this repo.
+# A static site. /api and /uploads are proxied to the main Usil service, so the
+# browser sees one origin and the HttpOnly session cookie works without CORS.
+# The target is the onrender.com host, not usil.app: Cloudflare's Bot Fight Mode on
+# usil.app would challenge these server-to-server requests.
+services:
+  - type: web
+    runtime: static
+    name: usil-vendor
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://usil-emjc.onrender.com/api/*
+      - type: rewrite
+        source: /uploads/*
+        destination: https://usil-emjc.onrender.com/uploads/*
+    headers:
+      # a private console: keep it out of search results and out of iframes
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+    # domains:
+    #   - vendor.usil.app
