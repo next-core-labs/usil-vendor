@@ -84,6 +84,43 @@ export function dayLabel(key: string): string {
   return Number.isNaN(parsed.getTime()) ? key : dayLabelFormatter.format(parsed);
 }
 
+const clockFormatter = new Intl.DateTimeFormat(AR, { hour: 'numeric', minute: '2-digit' });
+const weekdayFormatter = new Intl.DateTimeFormat(AR, { weekday: 'long' });
+
+/** Whole calendar days from `date` to today, in local time. */
+function daysAgo(date: Date): number {
+  const now = new Date();
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((start(now) - start(date)) / 86_400_000);
+}
+
+export function clockTime(raw: string | undefined | null): string {
+  const parsed = parseServerDate(raw);
+  return parsed ? clockFormatter.format(parsed) : '';
+}
+
+/** Chat-list time: the clock today, «أمس», the weekday this week, else a date. */
+export function shortWhen(raw: string | undefined | null): string {
+  const parsed = parseServerDate(raw);
+  if (!parsed) return '—';
+  const days = daysAgo(parsed);
+  if (days <= 0) return clockFormatter.format(parsed);
+  if (days === 1) return 'أمس';
+  if (days < 7) return weekdayFormatter.format(parsed);
+  return (parsed.getFullYear() === new Date().getFullYear() ? dayLabelFormatter : dateFormatter).format(parsed);
+}
+
+/** The separator above a day's messages in a thread. */
+export function dayHeading(raw: string | undefined | null): string {
+  const parsed = parseServerDate(raw);
+  if (!parsed) return '—';
+  const days = daysAgo(parsed);
+  if (days <= 0) return 'اليوم';
+  if (days === 1) return 'أمس';
+  if (days < 7) return weekdayFormatter.format(parsed);
+  return dateFormatter.format(parsed);
+}
+
 export function uptime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
   const days = Math.floor(total / 86400);

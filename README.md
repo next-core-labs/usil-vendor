@@ -66,15 +66,16 @@ hostname as the API.
 ```
 src/
   api/          client.ts (fetch + error envelope), endpoints.ts (typed calls), types.ts
-  state/        session, toasts
+  state/        session, toasts, unread-chat badge
   components/
     ui/         Button, Card, Badge, Table, Modal, StatTile, form controls
     charts/     AreaChart, BarChart, Sparkline — hand-rolled SVG/CSS
     listings/   ImagesPicker, CityPicker, ListingModal
     layout/     Shell (sidebar + topbar), nav definition
+    chat/       ChatInbox, ChatThread, useChat — the vendor side of in-app chat
   screens/      one file per section
   data/         saudiPlaces.ts — MIRRORED, see below
-  lib/          format (Arabic + SAR), router (hash), theme, useResource, labels
+  lib/          format (Arabic + SAR), router (hash), theme, useResource, usePoll, labels
 ```
 
 ### Screens → endpoints
@@ -86,6 +87,7 @@ src/
 | منتجاتي | `GET/POST/PATCH/DELETE /api/vendor/listings`, `POST /api/uploads` |
 | ملفي التجاري | `GET /api/me/vendor-file` (read-only — see below) |
 | حسابات التواصل | `GET/PUT /api/vendor/socials` |
+| المحادثات | `GET /api/chats`, `GET /api/chats/unread`, `GET /api/chats/:id?after=`, `POST /api/chats` (team thread only), `POST /api/chats/:id/messages`, `POST /api/chats/:id/read` |
 
 ## Four API shapes worth knowing
 
@@ -111,6 +113,36 @@ All four cost real debugging time, so they are commented at the call site too.
   `validateVendorListing` drops any name `isSaudiPlaceName` rejects and falls back
   to الرياض without complaint, so a free-text city field would quietly publish the
   wrong coverage. `CityPicker` only emits names from the list.
+
+## المحادثات — where «اسأل المورّد» lands
+
+When a client taps «اسأل المورّد» on a listing (or «راسل المورّد» on the
+storefront page), the message is stored by `server/chat/` as a `client_vendor`
+thread. This screen is the vendor's side of it: `src/components/chat/` mirrors
+the folder of the same name in `../usil` (inbox + thread + hooks), rebuilt on
+this console's primitives and tokens.
+
+Things the server decides that the screen leans on:
+
+- **Scoping is server-side.** `GET /api/chats` returns only threads whose
+  `vendorId` is the session user, so nothing here filters by id.
+- **A vendor can start only the team thread.** `POST /api/chats` from a vendor
+  ignores `vendorId` and opens their one `vendor_owner` thread with فريق يوصل.
+  Client threads are created by the client; the vendor only replies. That is
+  why the team row is pinned at the top before it exists and there is no
+  "new conversation" button.
+- **Messages carry a `context`** (`{type: 'listing' | 'booking', id, title}`)
+  — the product the client was looking at. It renders as «بخصوص: …» above the
+  bubble, so the vendor knows which product the question is about.
+- **Supervisors see a pointer, not an inbox.** An `admin` signed in here is
+  answered by `/api/chats` as the *owner* side (the team's shared inbox with
+  every vendor), so the screen and the sidebar badge are gated on
+  `user.role === 'vendor'`.
+
+Delivery is polling (`src/lib/usePoll.ts`): the inbox every 15 s, an open
+thread every 5 s, the sidebar badge every 15 s — all paused while the tab is
+hidden. Opening a thread posts `/read`, which clears its unread count and
+refreshes the badge through `UnreadContext`.
 
 ## Why ملفي التجاري is read-only
 

@@ -2,6 +2,9 @@ import { api } from './client.ts';
 import type {
   BlockedDate,
   BlockedDateType,
+  ChatMessage,
+  Conversation,
+  ConversationSummary,
   ListingDraft,
   PublicUser,
   SocialNetwork,
@@ -92,4 +95,29 @@ export const socials = {
 export const uploads = {
   image: (dataUrl: string) =>
     api.post<{ url: string }>('/api/uploads', { prefix: 'listing', dataUrl }).then((r) => r.url),
+};
+
+export const chats = {
+  /** The vendor's own threads, newest activity first. */
+  list: () => api.get<Listed<ConversationSummary>>('/api/chats').then((r) => r.data),
+  /** A single count, cheap enough to poll for the sidebar badge. */
+  unread: () => api.get<Wrapped<{ count: number }>>('/api/chats/unread').then((r) => r.data.count),
+  /**
+   * A vendor can only START a thread with the Usil team — client threads are
+   * opened by the client from the storefront. The server infers the vendor
+   * from the session, so no `vendorId` is sent. There are no empty threads:
+   * this creates the team thread with its first message or appends to it.
+   */
+  startTeamThread: (body: string) =>
+    api.post<Wrapped<Conversation>>('/api/chats', { body }).then((r) => r.data),
+  /** With `after`, only newer messages come back; an id the server no longer has returns them all. */
+  get: (id: string, after?: string) =>
+    api
+      .get<Wrapped<Conversation>>(
+        `/api/chats/${encodeURIComponent(id)}${after ? `?after=${encodeURIComponent(after)}` : ''}`,
+      )
+      .then((r) => r.data),
+  send: (id: string, body: string) =>
+    api.post<Wrapped<ChatMessage>>(`/api/chats/${encodeURIComponent(id)}/messages`, { body }).then((r) => r.data),
+  markRead: (id: string) => api.post<unknown>(`/api/chats/${encodeURIComponent(id)}/read`),
 };

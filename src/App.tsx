@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { SessionProvider, isVendorAccount, useSession } from './state/SessionContext.tsx';
 import { ToastProvider } from './state/ToastContext.tsx';
+import { UnreadProvider } from './state/UnreadContext.tsx';
 import { Shell } from './components/layout/Shell.tsx';
 import { useRoute } from './lib/router.ts';
 import { Login, NotAuthorized } from './screens/Login.tsx';
@@ -9,6 +10,7 @@ import { Listings } from './screens/Listings.tsx';
 import { Calendar } from './screens/Calendar.tsx';
 import { Storefront } from './screens/Storefront.tsx';
 import { Socials } from './screens/Socials.tsx';
+import { Chats } from './screens/Chats.tsx';
 
 function Screen() {
   const route = useRoute();
@@ -21,6 +23,8 @@ function Screen() {
       return <Storefront />;
     case 'socials':
       return <Socials />;
+    case 'chats':
+      return <Chats />;
     default:
       return <Overview />;
   }
@@ -41,9 +45,11 @@ function Gate() {
   if (!isVendorAccount(user)) return <NotAuthorized name={user.name} onSignOut={() => void signOut()} />;
 
   return (
-    <Shell>
-      <Screen />
-    </Shell>
+    <UnreadProvider>
+      <Shell>
+        <Screen />
+      </Shell>
+    </UnreadProvider>
   );
 }
 
