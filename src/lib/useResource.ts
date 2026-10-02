@@ -8,8 +8,11 @@ export type Resource<T> = {
   loading: boolean;
   refreshing: boolean;
   reload: () => Promise<void>;
-  /** Apply a local edit after a successful write, instead of refetching. */
-  set: (next: T) => void;
+  /**
+   * Apply a local edit after a successful write, instead of refetching. Takes
+   * a value or an updater, so a poll that lands mid-edit cannot be overwritten.
+   */
+  set: (next: T | null | ((current: T | null) => T | null)) => void;
 };
 
 /**

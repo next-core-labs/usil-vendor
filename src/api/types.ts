@@ -175,3 +175,45 @@ export type VendorSocials = {
   confirmedOwn: boolean;
   links: VendorSocialLink[];
 };
+
+/* ── Chat — mirrors `server/chat/chat-store.ts` ─────────────────────── */
+
+/**
+ * In-app chat. A vendor sees two kinds of thread: `client_vendor` (a client
+ * who tapped «اسأل المورّد» on a listing or the storefront page) and one
+ * `vendor_owner` thread with فريق يوصل. `canAccess` on the server scopes the
+ * list to the signed-in vendor's own threads, so nothing here filters by id.
+ */
+export type ChatSide = 'client' | 'vendor' | 'owner';
+export type ChatKind = 'client_vendor' | 'vendor_owner';
+
+/** What a message is about — shown above it as «بخصوص: …». */
+export type ChatContext = { type: 'listing' | 'booking'; id: string; title: string };
+
+export type ChatMessage = {
+  id: string;
+  /** Position in its thread, 1-based and never reused. */
+  seq: number;
+  side: ChatSide;
+  senderId: string;
+  senderName: string;
+  body: string;
+  context?: ChatContext;
+  createdAt: string;
+};
+
+type ConversationBase = {
+  id: string;
+  kind: ChatKind;
+  vendorId: string;
+  vendorName: string;
+  /** Present on `client_vendor` threads only. */
+  clientId?: string;
+  clientName?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ConversationSummary = ConversationBase & { lastMessage: ChatMessage | null; unread: number };
+
+export type Conversation = ConversationBase & { messages: ChatMessage[] };

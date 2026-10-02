@@ -5,7 +5,8 @@ import { navigate, useRoute } from '../../lib/router.ts';
 import { useTheme, type Theme } from '../../lib/theme.ts';
 import { useSession } from '../../state/SessionContext.tsx';
 import { ROLE_LABEL } from '../../lib/labels.ts';
-import { initials } from '../../lib/format.ts';
+import { count, initials } from '../../lib/format.ts';
+import { useUnread } from '../../state/UnreadContext.tsx';
 import { Button } from '../ui/primitives.tsx';
 
 const THEMES: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -43,6 +44,7 @@ function ThemeToggle() {
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const route = useRoute();
+  const unread = useUnread();
 
   return (
     <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
@@ -53,6 +55,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
             {group.items.map((item) => {
               const Icon = item.icon;
               const active = route === item.route;
+              const badge = item.badge ? unread[item.badge] : 0;
               return (
                 <li key={item.route}>
                   <button
@@ -70,6 +73,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <Icon size={16} className="shrink-0" />
                     <span className="flex-1 text-start">{item.label}</span>
+                    {badge > 0 ? (
+                      <span
+                        className="tabular rounded-full bg-[var(--critical)] px-1.5 py-0.5 text-[11px] font-semibold text-white"
+                        aria-label={`${count(badge)} رسائل غير مقروءة`}
+                      >
+                        {count(badge)}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

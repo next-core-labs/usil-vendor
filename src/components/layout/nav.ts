@@ -1,7 +1,13 @@
-import { CalendarCheck, LayoutDashboard, Package, Share2, Store } from 'lucide-react';
+import { CalendarCheck, LayoutDashboard, MessagesSquare, Package, Share2, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-export type NavItem = { route: string; label: string; icon: LucideIcon };
+export type NavItem = {
+  route: string;
+  label: string;
+  icon: LucideIcon;
+  /** Which unread counter, if any, badges this item. */
+  badge?: 'chats';
+};
 export type NavGroup = { title: string; items: NavItem[] };
 
 export const NAV: NavGroup[] = [
@@ -10,6 +16,7 @@ export const NAV: NavGroup[] = [
     items: [
       { route: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
       { route: 'calendar', label: 'التقويم والحجوزات', icon: CalendarCheck },
+      { route: 'chats', label: 'المحادثات', icon: MessagesSquare, badge: 'chats' },
     ],
   },
   {
