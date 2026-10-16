@@ -13,6 +13,10 @@ import type {
   VendorListing,
   VendorSocials,
   VendorSummary,
+  MissingItem,
+  QuickSignupDraft,
+  VendorApplicationRow,
+  VendorDetailsDraft,
   VendorWorkspace,
 } from './types.ts';
 
@@ -33,6 +37,27 @@ export const auth = {
       remember,
     }),
   logout: () => api.post<unknown>('/api/auth/logout'),
+  /**
+   * Emails a 6-digit reset code. The answer is the same for unknown emails;
+   * `resetCode` only comes back on a local server with no mail configured.
+   */
+  forgotPassword: (email: string) =>
+    api.post<{ message?: string; resetCode?: string }>('/api/auth/forgot-password', { email }),
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    api.post<{ message?: string }>('/api/auth/reset-password', { email, code, newPassword }),
+};
+
+export const applications = {
+  /**
+   * A new email gets a client account, signed in on the spot, with access to
+   * the dashboard while pending. It becomes a vendor account — and its
+   * products public — only when the owner approves.
+   */
+  signup: (draft: QuickSignupDraft) =>
+    api.post<{ user: PublicUser | null; message?: string }>('/api/vendor-signup', draft),
+  /** Only while the application is pending. */
+  saveDetails: (draft: VendorDetailsDraft) =>
+    api.put<{ application: VendorApplicationRow; missing: MissingItem[] }>('/api/vendor/application', draft),
 };
 
 export const workspace = {

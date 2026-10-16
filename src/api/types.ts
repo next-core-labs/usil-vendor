@@ -150,10 +150,68 @@ export type VendorPublicFile = {
 
 /** `GET /api/me/vendor-file`. Every field is null before the vendor applies. */
 export type VendorFile = {
-  application: { status: ApplicationStatus; rejectReason?: string; createdAt: string } | null;
+  application: VendorApplicationRow | null;
+  /** What still blocks approval; empty unless the application is pending. */
+  missing?: MissingItem[];
   profile: VendorOwnProfile | null;
   file: VendorPublicFile | null;
 };
+
+/** `publicApplication()` — the applicant's own row, without the password hash. */
+export type VendorApplicationRow = {
+  id: string;
+  status: ApplicationStatus;
+  rejectReason?: string;
+  createdAt: string;
+  signup?: 'quick';
+  firstName: string;
+  fatherName: string;
+  familyName: string;
+  projectName: string;
+  projectType: string;
+  projectTypeOther?: string;
+  nationalId: string;
+  commercialRegister?: string;
+  email: string;
+  phone: string;
+  bankName: string;
+  iban: string;
+  accountHolderName: string;
+  fulfillment: FulfillmentLane[];
+  logoUrl?: string;
+};
+
+/** `POST /api/vendor-signup` — the short form; everything else is completed in the dashboard. */
+export type QuickSignupDraft = {
+  name: string;
+  projectName: string;
+  projectType: string;
+  projectTypeOther: string;
+  email: string;
+  phone: string;
+  password: string;
+};
+
+/** `PUT /api/vendor/application` — a pending vendor's own details. A sent field must be valid. */
+export type VendorDetailsDraft = Partial<{
+  firstName: string;
+  fatherName: string;
+  familyName: string;
+  nationalId: string;
+  commercialRegister: string;
+  projectName: string;
+  projectType: string;
+  projectTypeOther: string;
+  bankName: string;
+  iban: string;
+  accountHolderName: string;
+  fulfillment: FulfillmentLane[];
+  logoDataUrl: string;
+}>;
+
+/** `missingForApproval` in `server/vendors/vendor-applications.ts`. */
+export type MissingKey = 'names' | 'nationalId' | 'bank' | 'fulfillment' | 'socials' | 'listings';
+export type MissingItem = { key: MissingKey; label: string };
 
 /* ── Socials ────────────────────────────────────────────────────────── */
 

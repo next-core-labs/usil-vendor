@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal.tsx';
 import { Button, Field, Input, Select, Textarea } from '../ui/primitives.tsx';
+import { useAccount } from '../../state/AccountContext.tsx';
 import { ImagesPicker } from './ImagesPicker.tsx';
 import { CityPicker } from './CityPicker.tsx';
 import {
@@ -48,6 +49,7 @@ export function ListingModal({
   onClose: () => void;
   onSubmit: (draft: ListingDraft) => void;
 }) {
+  const { mode } = useAccount();
   const [draft, setDraft] = useState<ListingDraft>(() => draftFrom(listing));
   const [uploading, setUploading] = useState(false);
 
@@ -88,7 +90,7 @@ export function ListingModal({
             disabled={uploading || missingImages || missingLanes}
             onClick={() => onSubmit(draft)}
           >
-            {listing ? 'حفظ التعديل' : 'نشر المنتج'}
+            {listing ? 'حفظ التعديل' : mode === 'pending' ? 'حفظ المنتج' : 'نشر المنتج'}
           </Button>
         </>
       }

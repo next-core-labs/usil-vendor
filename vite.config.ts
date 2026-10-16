@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5190,
-    // Same-origin in dev, so the backend's HttpOnly `midyaf_sid` cookie
+    // Same-origin in dev, so the backend's HttpOnly `usil_sid` cookie
     // (SameSite=Lax) is sent with every call without any CORS setup.
     // `/uploads` is proxied too: listing photos are served from there.
     proxy: {

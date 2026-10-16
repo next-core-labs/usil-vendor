@@ -10,6 +10,7 @@ import {
   SOCIAL_STATUS_LABEL,
 } from '../lib/labels.ts';
 import { useToast } from '../state/ToastContext.tsx';
+import { useAccount } from '../state/AccountContext.tsx';
 import {
   Badge,
   Button,
@@ -37,6 +38,7 @@ function draftFrom(socials: VendorSocials | null): Draft {
 
 export function Socials() {
   const toast = useToast();
+  const account = useAccount();
   const resource = useResource(socialsApi.read);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [confirmedOwn, setConfirmedOwn] = useState(false);
@@ -56,6 +58,7 @@ export function Socials() {
       const saved = await socialsApi.save({ ...draft, confirmedOwn });
       resource.set(saved);
       toast.success('حُفظت حسابات التواصل.');
+      void account.reload();
     } catch (caught) {
       toast.failure(errorText(caught));
     } finally {

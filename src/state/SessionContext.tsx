@@ -9,6 +9,8 @@ type SessionState = {
   error: string | null;
   signIn: (identifier: string, password: string, remember: boolean) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Re-reads the session — an approval turns the same account into a vendor. */
+  refresh: () => Promise<PublicUser | null>;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
@@ -69,9 +71,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    const result = await auth.me();
+    setUser(result.user);
+    return result.user;
+  }, []);
+
   const value = useMemo<SessionState>(
-    () => ({ user, loading, error, signIn, signOut }),
-    [user, loading, error, signIn, signOut],
+    () => ({ user, loading, error, signIn, signOut, refresh }),
+    [user, loading, error, signIn, signOut, refresh],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

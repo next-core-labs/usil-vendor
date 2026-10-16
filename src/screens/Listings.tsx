@@ -11,6 +11,7 @@ import {
   labelFor,
 } from '../lib/labels.ts';
 import { useToast } from '../state/ToastContext.tsx';
+import { useAccount } from '../state/AccountContext.tsx';
 import { Badge, Button, Card, EmptyState, ErrorNote, PageHeader } from '../components/ui/primitives.tsx';
 import { DataTable, Toolbar, type Column } from '../components/ui/Table.tsx';
 import { ConfirmDialog } from '../components/ui/Modal.tsx';
@@ -23,6 +24,7 @@ function thumbOf(listing: VendorListing): string | undefined {
 
 export function Listings() {
   const toast = useToast();
+  const account = useAccount();
   const rows = useResource(listingsApi.list);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<VendorListing | null>(null);
@@ -51,11 +53,13 @@ export function Listings() {
         toast.success('تم حفظ تعديل المنتج.');
       } else {
         await listingsApi.create(draft);
-        toast.success('نُشر المنتج في متجر يوصل.');
+        toast.success(
+          account.mode === 'pending' ? 'حُفظ المنتج — يظهر للعملاء بعد اعتماد متجرك.' : 'نُشر المنتج في متجر يوصل.',
+        );
       }
       setFormOpen(false);
       setEditing(null);
-      await rows.reload();
+      await Promise.all([rows.reload(), account.reload()]);
     } catch (caught) {
       // The server answers with the exact sentence the vendor needs to act on.
       toast.failure(errorText(caught));
@@ -71,7 +75,7 @@ export function Listings() {
       await listingsApi.remove(removing.id);
       toast.success('حُذف المنتج من المتجر.');
       setRemoving(null);
-      await rows.reload();
+      await Promise.all([rows.reload(), account.reload()]);
     } catch (caught) {
       toast.failure(errorText(caught));
     } finally {
@@ -179,7 +183,11 @@ export function Listings() {
     <>
       <PageHeader
         title="منتجاتي"
-        subtitle="كل منتج هنا يظهر مباشرة في متجر يوصل — لا يوجد كتالوج جاهز."
+        subtitle={
+          account.mode === 'pending'
+            ? 'أضف منتجاتك بصورها وأسعارها — تظهر في متجر يوصل بعد اعتماد متجرك.'
+            : 'كل منتج هنا يظهر مباشرة في متجر يوصل — لا يوجد كتالوج جاهز.'
+        }
         action={
           <div className="flex gap-2">
             <Button
