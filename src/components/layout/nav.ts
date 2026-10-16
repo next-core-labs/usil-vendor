@@ -29,6 +29,9 @@ export const NAV: NavGroup[] = [
   },
 ];
 
+/** Sections that need a live store: hidden until the owner approves the vendor. */
+export const PENDING_HIDDEN_ROUTES = ['calendar', 'chats'];
+
 export function labelForRoute(route: string): string {
   for (const group of NAV) {
     const found = group.items.find((item) => item.route === route);

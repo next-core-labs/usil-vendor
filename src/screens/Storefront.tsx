@@ -16,6 +16,8 @@ import {
   type Tone,
 } from '../components/ui/primitives.tsx';
 import type { ApplicationStatus } from '../api/types.ts';
+import { useAccount } from '../state/AccountContext.tsx';
+import { DetailsForm } from '../components/storefront/DetailsForm.tsx';
 
 const STATUS_TONE: Record<ApplicationStatus, Tone> = {
   approved: 'good',
@@ -36,6 +38,20 @@ function Row({ icon, label, value }: { icon: ReactNode; label: string; value: st
 }
 
 export function Storefront() {
+  const account = useAccount();
+  if (account.mode === 'pending' && account.file?.application) {
+    return (
+      <>
+        <PageHeader title="ملفي التجاري" subtitle="أكمل بيانات متجرك — تراجعها إدارة يوصل قبل الاعتماد." />
+        <DetailsForm application={account.file.application} />
+      </>
+    );
+  }
+  return <ApprovedStorefront />;
+}
+
+/** Read-only once approved: the file is the approved application. */
+function ApprovedStorefront() {
   const resource = useResource(storefront.file);
   const profile = resource.data?.profile;
   const file = resource.data?.file;

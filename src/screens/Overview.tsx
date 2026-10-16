@@ -10,6 +10,7 @@ import { StatTile } from '../components/ui/StatTile.tsx';
 import { AreaChart, type AreaPoint } from '../components/charts/AreaChart.tsx';
 import { BarChart, type BarRow } from '../components/charts/BarChart.tsx';
 import type { VendorBooking, VendorListing } from '../api/types.ts';
+import { useAccount } from '../state/AccountContext.tsx';
 
 const TREND_DAYS = 30;
 
@@ -50,6 +51,8 @@ function byCategory(listings: VendorListing[]): BarRow[] {
 export function Overview() {
   const ws = useResource(workspace.read);
   const file = useResource(storefront.file);
+  // The pending checklist banner covers status; a store page and bookings come with approval.
+  const pending = useAccount().mode === 'pending';
 
   const bookings = useMemo(() => ws.data?.bookings || [], [ws.data]);
   const listings = useMemo(() => ws.data?.listings || [], [ws.data]);
@@ -82,7 +85,7 @@ export function Overview() {
         title="نظرة عامة"
         subtitle={publicFile?.projectName ? `متجر ${publicFile.projectName}` : 'ملخّص متجرك في يوصل'}
         action={
-          publicFile ? (
+          publicFile && !pending ? (
             <Button
               size="sm"
               icon={<ExternalLink size={15} />}
@@ -96,7 +99,7 @@ export function Overview() {
 
       {ws.error ? <ErrorNote message={ws.error} onRetry={() => void ws.reload()} /> : null}
 
-      {application && application.status !== 'approved' ? (
+      {application && application.status !== 'approved' && !pending ? (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[var(--warning-wash)] px-4 py-3">
           <AlertTriangle size={17} className="shrink-0 text-ink" aria-hidden />
           <p className="flex-1 text-[13px] leading-6 text-ink">
@@ -109,7 +112,7 @@ export function Overview() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="منتجات منشورة"
+          label={pending ? 'منتجاتي' : 'منتجات منشورة'}
           value={count(listings.length)}
           icon={<Package size={16} />}
           hint={categories.length ? `${count(categories.length)} قسم` : 'ما نشرت منتجاً بعد'}
@@ -166,9 +169,11 @@ export function Overview() {
           title="القادم في تقويمك"
           subtitle="أقرب خمسة حجوزات"
           action={
-            <Button size="sm" variant="ghost" onClick={() => navigate('calendar')}>
-              كل التقويم
-            </Button>
+            pending ? undefined : (
+              <Button size="sm" variant="ghost" onClick={() => navigate('calendar')}>
+                كل التقويم
+              </Button>
+            )
           }
         />
         {upcoming.length ? (

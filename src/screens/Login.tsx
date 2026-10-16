@@ -1,17 +1,24 @@
 import { useState, type FormEvent } from 'react';
-import { Store } from 'lucide-react';
+import { Store, UserPlus } from 'lucide-react';
 import { useSession } from '../state/SessionContext.tsx';
 import { Button, Field, Input } from '../components/ui/primitives.tsx';
+import { ResetPassword } from './ResetPassword.tsx';
+import { Register } from './Register.tsx';
+import { navigate } from '../lib/router.ts';
 
 export function Login() {
-  const { signIn, error } = useSession();
-  const [identifier, setIdentifier] = useState('');
+  const { signIn, error, refresh } = useSession();
+  // The storefront's «انضم كمورّد» links here with `?email=` once the account exists.
+  const [identifier, setIdentifier] = useState(() => new URLSearchParams(window.location.search).get('email') || '');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<'login' | 'reset' | 'register'>('login');
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    setNotice(null);
     setBusy(true);
     try {
       await signIn(identifier.trim(), password, remember);
@@ -25,7 +32,7 @@ export function Login() {
   return (
     <div className="grid min-h-full lg:grid-cols-2">
       {/* Brand panel — decorative, so it is dropped entirely on small screens. */}
-      <div className="relative hidden overflow-hidden bg-accent p-12 lg:flex lg:flex-col lg:justify-between">
+      <div className="hidden overflow-hidden bg-accent p-12 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:self-start lg:flex-col lg:justify-between">
         <div
           aria-hidden
           className="pointer-events-none absolute -top-24 -start-24 size-[420px] rounded-full"
@@ -43,86 +50,120 @@ export function Login() {
             منتجاتك وتقويمك وحجوزاتك وملفك التجاري — كلها من مكان واحد، متصلة مباشرة بخادم يوصل.
           </p>
         </div>
-        <p className="relative text-xs text-white/60">هذه اللوحة لأصحاب المتاجر المعتمدين في يوصل.</p>
+        <p className="relative text-xs text-white/60">سجّل متجرك، ويفتح لك فريق يوصل اللوحة بعد مراجعة طلبك.</p>
       </div>
 
-      <div className="flex items-center justify-center p-6">
-        <form onSubmit={onSubmit} className="w-full max-w-sm">
-          <div className="mb-7">
-            <span className="mb-4 grid size-10 place-items-center rounded-xl bg-[var(--accent-wash)] text-accent lg:hidden">
-              <Store size={20} />
-            </span>
-            <h2 className="text-xl font-semibold text-ink">تسجيل الدخول</h2>
-            <p className="mt-1 text-sm text-ink-secondary">ادخل ببريد حسابك في يوصل.</p>
-          </div>
+      <div className="flex items-center justify-center p-6 py-10">
+        {mode === 'register' ? (
+          <Register
+            onCancel={() => setMode('login')}
+            onSubmitted={async (message) => {
+              // The server signs the new vendor in; open the dashboard on their products.
+              const user = await refresh().catch(() => null);
+              if (user) {
+                navigate('listings');
+                return;
+              }
+              setMode('login');
+              setNotice(message);
+            }}
+          />
+        ) : mode === 'reset' ? (
+          <ResetPassword
+            initialEmail={identifier.trim()}
+            onDone={(message) => {
+              setMode('login');
+              setNotice(message || null);
+              setPassword('');
+            }}
+          />
+        ) : (
+          <form onSubmit={onSubmit} className="w-full max-w-sm">
+            <div className="mb-7">
+              <span className="mb-4 grid size-10 place-items-center rounded-xl bg-[var(--accent-wash)] text-accent lg:hidden">
+                <Store size={20} />
+              </span>
+              <h2 className="text-xl font-semibold text-ink">تسجيل الدخول</h2>
+              <p className="mt-1 text-sm text-ink-secondary">ادخل ببريد حسابك في يوصل.</p>
+            </div>
 
-          <div className="space-y-4">
-            <Field label="البريد الإلكتروني">
-              <Input
-                type="email"
-                dir="ltr"
-                autoComplete="username"
-                required
-                value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
-                placeholder="vendor@usil.app"
-                className="text-start"
-              />
-            </Field>
+            <div className="space-y-4">
+              <Field label="البريد الإلكتروني">
+                <Input
+                  type="email"
+                  dir="ltr"
+                  autoComplete="username"
+                  required
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  placeholder="vendor@usil.app"
+                  className="text-start"
+                />
+              </Field>
 
-            <Field label="الرقم السري">
-              <Input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
-              />
-            </Field>
+              <Field label="الرقم السري">
+                <Input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="••••••••"
+                />
+              </Field>
 
-            <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(event) => setRemember(event.target.checked)}
-                className="size-4 accent-[var(--accent)]"
-              />
-              أبقني مسجّلاً لمدة ٣٠ يوماً
-            </label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="flex items-center gap-2 text-[13px] text-ink-secondary">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(event) => setRemember(event.target.checked)}
+                    className="size-4 accent-[var(--accent)]"
+                  />
+                  أبقني مسجّلاً لمدة ٣٠ يوماً
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotice(null);
+                    setMode('reset');
+                  }}
+                  className="shrink-0 text-[13px] font-medium text-accent hover:underline"
+                >
+                  نسيت الرقم السري؟
+                </button>
+              </div>
 
-            {error ? (
-              <p className="rounded-lg border border-[color-mix(in_srgb,var(--critical)_30%,transparent)] bg-[var(--critical-wash)] px-3 py-2.5 text-[13px] text-ink">
-                {error}
-              </p>
-            ) : null}
+              {notice ? (
+                <p className="rounded-lg border border-line bg-sunken px-3 py-2.5 text-[13px] text-ink-secondary">{notice}</p>
+              ) : null}
+              {error && !notice ? (
+                <p className="rounded-lg border border-[color-mix(in_srgb,var(--critical)_30%,transparent)] bg-[var(--critical-wash)] px-3 py-2.5 text-[13px] text-ink">
+                  {error}
+                </p>
+              ) : null}
 
-            <Button type="submit" variant="primary" busy={busy} className="w-full">
-              دخول
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+              <Button type="submit" variant="primary" busy={busy} className="w-full">
+                دخول
+              </Button>
+            </div>
 
-/** Signed in, but not with a role the vendor API will accept. */
-export function NotAuthorized({ name, onSignOut }: { name: string; onSignOut: () => void }) {
-  return (
-    <div className="flex min-h-full items-center justify-center p-6">
-      <div className="max-w-md text-center">
-        <span className="mx-auto mb-4 grid size-12 place-items-center rounded-xl bg-[var(--critical-wash)] text-[var(--critical)]">
-          <Store size={22} />
-        </span>
-        <h1 className="text-xl font-semibold text-ink">هذا الحساب لا يملك صلاحية اللوحة</h1>
-        <p className="mt-2 text-sm leading-7 text-ink-secondary">
-          دخلت باسم {name}، ولوحة المورّد متاحة لحسابات المورّدين المعتمدين فقط. إذا قدّمت طلب
-          انضمام ولم يُعتمد بعد، راجع بريدك أو تواصل مع إدارة يوصل.
-        </p>
-        <Button variant="secondary" className="mt-5" onClick={onSignOut}>
-          تسجيل الخروج
-        </Button>
+            <div className="mt-6 border-t border-line pt-5 text-center">
+              <p className="text-[13px] text-ink-secondary">ما عندك حساب مورّد؟</p>
+              <Button
+                variant="secondary"
+                icon={<UserPlus size={15} />}
+                className="mt-2 w-full"
+                onClick={() => {
+                  setNotice(null);
+                  setMode('register');
+                }}
+              >
+                سجّل كمورّد جديد
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

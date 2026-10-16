@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { LogOut, Menu, Monitor, Moon, Sun, X } from 'lucide-react';
-import { NAV, labelForRoute } from './nav.ts';
+import { NAV, PENDING_HIDDEN_ROUTES, labelForRoute } from './nav.ts';
+import { PendingBanner } from './PendingBanner.tsx';
+import { useAccount } from '../../state/AccountContext.tsx';
 import { navigate, useRoute } from '../../lib/router.ts';
 import { useTheme, type Theme } from '../../lib/theme.ts';
 import { useSession } from '../../state/SessionContext.tsx';
@@ -45,10 +47,15 @@ function ThemeToggle() {
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const route = useRoute();
   const unread = useUnread();
+  const { mode } = useAccount();
+  const groups = NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => mode !== 'pending' || !PENDING_HIDDEN_ROUTES.includes(item.route)),
+  })).filter((group) => group.items.length);
 
   return (
     <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-      {NAV.map((group) => (
+      {groups.map((group) => (
         <div key={group.title}>
           <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wide text-ink-muted">{group.title}</p>
           <ul className="space-y-0.5">
@@ -109,6 +116,7 @@ function Brand() {
 export function Shell({ children }: { children: ReactNode }) {
   const route = useRoute();
   const { user, signOut } = useSession();
+  const { mode } = useAccount();
   const [drawer, setDrawer] = useState(false);
 
   // The drawer is a mobile affordance; a route change must always close it.
@@ -164,7 +172,9 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <div className="hidden text-end sm:block">
               <p className="text-[13px] font-medium leading-tight text-ink">{user?.name}</p>
-              <p className="text-[11px] text-ink-muted">{user ? ROLE_LABEL[user.role] : ''}</p>
+              <p className="text-[11px] text-ink-muted">
+                {mode === 'pending' ? 'مورّد — قيد المراجعة' : user ? ROLE_LABEL[user.role] : ''}
+              </p>
             </div>
             <span className="grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-sunken text-xs font-semibold text-ink-secondary">
               {user?.avatarUrl ? (
@@ -184,7 +194,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 p-4 sm:p-6">{children}</main>
+        <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 p-4 sm:p-6">
+          <PendingBanner />
+          {children}
+        </main>
       </div>
     </div>
   );

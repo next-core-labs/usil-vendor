@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "cf:dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -23,6 +25,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "wrangler": "^4.150.0"
   }
 }
