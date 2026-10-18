@@ -18,6 +18,7 @@ import {
 import type { ApplicationStatus } from '../api/types.ts';
 import { useAccount } from '../state/AccountContext.tsx';
 import { DetailsForm } from '../components/storefront/DetailsForm.tsx';
+import { publicStoreUrl } from '../lib/publicSite.ts';
 
 const STATUS_TONE: Record<ApplicationStatus, Tone> = {
   approved: 'good',
@@ -77,7 +78,7 @@ function ApprovedStorefront() {
               <Button
                 size="sm"
                 icon={<ExternalLink size={15} />}
-                onClick={() => window.open(`/vendor/${encodeURIComponent(file.vendorId)}`, '_blank')}
+                onClick={() => window.open(publicStoreUrl(file.vendorId), '_blank', 'noopener')}
               >
                 عرض متجري
               </Button>
@@ -184,13 +185,13 @@ function ApprovedStorefront() {
               <CardHeader title="رابط متجرك" subtitle="انسخه وضعه في البايو أو أرسله للعميل مباشرة." />
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5">
                 <code dir="ltr" className="min-w-0 flex-1 truncate text-[13px] text-ink">
-                  {`${window.location.origin}/vendor/${file.vendorId}`}
+                  {publicStoreUrl(file.vendorId)}
                 </code>
                 <Button
                   size="sm"
                   onClick={() => {
                     void navigator.clipboard
-                      ?.writeText(`${window.location.origin}/vendor/${file.vendorId}`)
+                      ?.writeText(publicStoreUrl(file.vendorId))
                       .catch(() => {
                         /* a blocked clipboard is not worth an error state — the
                            link is on screen and selectable either way */

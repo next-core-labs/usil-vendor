@@ -13,8 +13,10 @@ export type Column<T> = {
 };
 
 /**
- * One table for every list in the dashboard. It scrolls horizontally inside its
- * own container so a wide row never makes the page scroll sideways.
+ * One table for every list in the dashboard. From `sm` up it scrolls
+ * horizontally inside its own container so a wide row never makes the page
+ * scroll sideways. Below `sm` each row stacks into a card — header beside value
+ * — so price, status and the row's buttons are on screen without a hidden swipe.
  */
 export function DataTable<T>({
   columns,
@@ -33,9 +35,9 @@ export function DataTable<T>({
   if (!rows.length) return <>{empty}</>;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
+    <div className="sm:overflow-x-auto">
+      <table className="block w-full border-collapse text-sm sm:table">
+        <thead className="hidden sm:table-header-group">
           <tr className="border-b border-line">
             {columns.map((column) => (
               <th
@@ -49,18 +51,23 @@ export function DataTable<T>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="block sm:table-row-group">
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
-              className="border-b border-line last:border-0 transition-colors hover:bg-sunken/60"
+              className="block border-b border-line py-2 last:border-0 transition-colors hover:bg-sunken/60 sm:table-row sm:py-0"
             >
               {columns.map((column) => (
                 <td
                   key={column.key}
-                  className={`px-4 py-3 align-middle text-ink ${column.numeric ? 'tabular' : ''}`}
+                  className={`flex items-center gap-3 px-4 py-1.5 align-middle text-ink sm:table-cell sm:py-3 ${
+                    column.header ? '' : 'justify-end'
+                  } ${column.numeric ? 'tabular' : ''}`}
                 >
-                  {column.render(row)}
+                  {column.header ? (
+                    <span className="w-20 shrink-0 text-xs font-semibold text-ink-muted sm:hidden">{column.header}</span>
+                  ) : null}
+                  <div className="min-w-0 flex-1 sm:flex-none">{column.render(row)}</div>
                 </td>
               ))}
             </tr>

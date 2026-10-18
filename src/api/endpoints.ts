@@ -6,6 +6,7 @@ import type {
   Conversation,
   ConversationSummary,
   ListingDraft,
+  PlatformOrder,
   PublicUser,
   SocialNetwork,
   VendorBooking,
@@ -27,8 +28,8 @@ export const auth = {
   /** `user` is null when no session cookie is present — not an error. */
   me: () => api.get<{ user: PublicUser | null }>('/api/auth/me'),
   /**
-   * The server reads the address from `identifier` and requires it to contain
-   * an `@` when no phone is supplied, so sign-in sends `identifier`, not `email`.
+   * The server reads `identifier` as an email, or as a Saudi mobile when it
+   * has no `@`, so sign-in sends `identifier`, not `email`.
    */
   login: (identifier: string, password: string, remember: boolean) =>
     api.post<{ user: PublicUser; needsEmailVerification: boolean }>('/api/auth/login', {
@@ -45,6 +46,18 @@ export const auth = {
     api.post<{ message?: string; resetCode?: string }>('/api/auth/forgot-password', { email }),
   resetPassword: (email: string, code: string, newPassword: string) =>
     api.post<{ message?: string }>('/api/auth/reset-password', { email, code, newPassword }),
+  /**
+   * Login already emails a code to an unconfirmed account; this sends a fresh
+   * one. The session cookie proves ownership, so no mobile is needed.
+   * `verificationCode` only comes back on a local server with no mail configured.
+   */
+  resendVerification: (email: string) =>
+    api.post<{ message?: string; emailSent?: boolean; verificationCode?: string }>(
+      '/api/auth/resend-verification',
+      { email },
+    ),
+  verifyEmail: (email: string, code: string) =>
+    api.post<{ user?: PublicUser; message?: string }>('/api/auth/verify-email', { email, code }),
 };
 
 export const applications = {
@@ -74,6 +87,16 @@ export const listings = {
       .patch<{ listing: VendorListing }>(`/api/vendor/listings/${encodeURIComponent(id)}`, input)
       .then((r) => r.listing),
   remove: (id: string) => api.delete<unknown>(`/api/vendor/listings/${encodeURIComponent(id)}`),
+};
+
+/** Store orders: approval-mode orders wait here for the vendor; paid ones move through delivery. */
+export const orders = {
+  list: () => api.get<Listed<PlatformOrder>>('/api/bookings').then((r) => r.data),
+  /** `reason` goes with a rejection or cancellation and is shown to the client. */
+  setStatus: (id: string, status: string, reason?: string) =>
+    api
+      .patch<{ booking: PlatformOrder }>(`/api/bookings/${encodeURIComponent(id)}`, reason ? { status, reason } : { status })
+      .then((r) => r.booking),
 };
 
 export const bookings = {

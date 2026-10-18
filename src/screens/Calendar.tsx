@@ -4,7 +4,7 @@ import { blockedDates as blockedApi, bookings as bookingsApi, workspace } from '
 import { errorText } from '../api/client.ts';
 import { useResource } from '../lib/useResource.ts';
 import { count, sar, shortDate } from '../lib/format.ts';
-import { BLOCKED_DATE_LABEL, BLOCKED_DATE_TYPES, BOOKING_STATUSES } from '../lib/labels.ts';
+import { BLOCKED_DATE_LABEL, BLOCKED_DATE_TYPES, BOOKING_STATUSES, bookingStatusLabel } from '../lib/labels.ts';
 import { useToast } from '../state/ToastContext.tsx';
 import {
   Badge,
@@ -139,7 +139,7 @@ export function Calendar() {
       key: 'customer',
       header: 'العميل',
       render: (row) => (
-        <span>
+        <span className="block break-words sm:max-w-[14rem]">
           <span className="block font-medium text-ink">{row.customerName}</span>
           <span className="tabular block text-xs text-ink-muted" dir="ltr">
             {row.customerPhone}
@@ -151,7 +151,7 @@ export function Calendar() {
       key: 'service',
       header: 'الخدمة',
       render: (row) => (
-        <span>
+        <span className="block break-words sm:max-w-xs">
           <span className="block text-ink">{row.serviceTitle}</span>
           <span className="block text-xs text-ink-muted">
             {row.venueName} · {row.city} · {count(row.guestCount)} ضيف
@@ -176,25 +176,28 @@ export function Calendar() {
       key: 'status',
       header: 'الحالة',
       width: '150px',
-      render: (row) => (
-        <Select
-          value={BOOKING_STATUSES.includes(row.status as never) ? row.status : ''}
-          aria-label={`حالة حجز ${row.customerName}`}
-          className="h-8 text-[13px]"
-          onChange={(event) =>
-            void run(() => bookingsApi.update(row.id, { status: event.target.value }), 'حُدّثت حالة الحجز.')
-          }
-        >
-          {BOOKING_STATUSES.includes(row.status as never) ? null : (
-            <option value="">{row.status || '—'}</option>
-          )}
-          {BOOKING_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </Select>
-      ),
+      render: (row) => {
+        // A hub booking's «confirmed» selects «مؤكد»; only Arabic values are offered or written.
+        const current = bookingStatusLabel(row.status);
+        const known = BOOKING_STATUSES.includes(current as never);
+        return (
+          <Select
+            value={known ? current : ''}
+            aria-label={`حالة حجز ${row.customerName}`}
+            className="h-8 text-[13px]"
+            onChange={(event) =>
+              void run(() => bookingsApi.update(row.id, { status: event.target.value }), 'حُدّثت حالة الحجز.')
+            }
+          >
+            {known ? null : <option value="">{current}</option>}
+            {BOOKING_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </Select>
+        );
+      },
     },
     {
       key: 'actions',
@@ -221,7 +224,7 @@ export function Calendar() {
     {
       key: 'reason',
       header: 'السبب',
-      render: (row) => <span className="text-ink-secondary">{row.reason}</span>,
+      render: (row) => <span className="block break-words text-ink-secondary sm:max-w-md">{row.reason}</span>,
     },
     {
       key: 'actions',

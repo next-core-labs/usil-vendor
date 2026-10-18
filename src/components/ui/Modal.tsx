@@ -127,10 +127,13 @@ export function ConfirmDialog({
   busy = false,
   onConfirm,
   onCancel,
+  children,
 }: {
   open: boolean;
   title: string;
   body: string;
+  /** Extra input under the message, e.g. a reason. */
+  children?: ReactNode;
   confirmLabel?: string;
   danger?: boolean;
   busy?: boolean;
@@ -153,6 +156,8 @@ export function ConfirmDialog({
           </Button>
         </>
       }
-    />
+    >
+      {children}
+    </Modal>
   );
 }

@@ -94,7 +94,8 @@ export function Listings() {
               <img src={thumbOf(row)} alt="" className="size-full object-cover" />
             ) : null}
           </span>
-          <span className="min-w-0">
+          {/* Capped, so a very long title truncates instead of stretching the table. */}
+          <span className="min-w-0 sm:max-w-xs" title={row.title}>
             <span className="block truncate font-medium text-ink">{row.title}</span>
             <span className="block truncate text-xs text-ink-muted">{row.shortDesc}</span>
           </span>

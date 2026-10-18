@@ -60,6 +60,27 @@ export type ListingDraft = {
 /* ── Calendar ───────────────────────────────────────────────────────── */
 
 /** `server/vendors/vendor-store.ts` → `VendorBookingRecord`. */
+/** A store order as `GET /api/bookings` returns it to a vendor (only this vendor's lines). */
+export type PlatformOrder = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  serviceName: string;
+  notes?: string;
+  city?: string;
+  eventDate: string;
+  eventTime?: string;
+  items?: Array<{ id: string; title: string; quantity: number; price: number; vendorId?: string }>;
+  totalAmount: number;
+  bookingMode?: 'instant' | 'approval';
+  status: string;
+  paymentStatus: 'unpaid' | 'paid';
+  /** Moyasar pay link, set once the client can pay. */
+  paymentUrl?: string;
+  createdAt?: string;
+};
+
 export type VendorBooking = {
   id: string;
   bookingNumber: string;

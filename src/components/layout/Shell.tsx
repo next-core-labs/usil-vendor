@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { LogOut, Menu, Monitor, Moon, Sun, X } from 'lucide-react';
 import { NAV, PENDING_HIDDEN_ROUTES, labelForRoute } from './nav.ts';
 import { PendingBanner } from './PendingBanner.tsx';
+import { VerifyEmailBanner } from './VerifyEmailBanner.tsx';
 import { useAccount } from '../../state/AccountContext.tsx';
 import { navigate, useRoute } from '../../lib/router.ts';
 import { useTheme, type Theme } from '../../lib/theme.ts';
@@ -83,7 +84,9 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                     {badge > 0 ? (
                       <span
                         className="tabular rounded-full bg-[var(--critical)] px-1.5 py-0.5 text-[11px] font-semibold text-white"
-                        aria-label={`${count(badge)} رسائل غير مقروءة`}
+                        aria-label={
+                          item.badge === 'orders' ? `${count(badge)} طلبات بانتظار موافقتك` : `${count(badge)} رسائل غير مقروءة`
+                        }
                       >
                         {count(badge)}
                       </span>
@@ -195,6 +198,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 p-4 sm:p-6">
+          <VerifyEmailBanner />
           <PendingBanner />
           {children}
         </main>
