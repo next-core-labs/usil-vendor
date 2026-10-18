@@ -15,6 +15,7 @@ import { Calendar } from './screens/Calendar.tsx';
 import { Storefront } from './screens/Storefront.tsx';
 import { Socials } from './screens/Socials.tsx';
 import { Chats } from './screens/Chats.tsx';
+import { Orders } from './screens/Orders.tsx';
 
 function Screen() {
   const route = useRoute();
@@ -26,6 +27,8 @@ function Screen() {
   }, [hidden]);
   if (hidden) return <Overview />;
   switch (route) {
+    case 'orders':
+      return <Orders />;
     case 'listings':
       return <Listings />;
     case 'calendar':

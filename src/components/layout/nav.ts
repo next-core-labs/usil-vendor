@@ -1,12 +1,12 @@
-import { CalendarCheck, LayoutDashboard, MessagesSquare, Package, Share2, Store } from 'lucide-react';
+import { CalendarCheck, Inbox, LayoutDashboard, MessagesSquare, Package, Share2, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export type NavItem = {
   route: string;
   label: string;
   icon: LucideIcon;
-  /** Which unread counter, if any, badges this item. */
-  badge?: 'chats';
+  /** Which counter, if any, badges this item. */
+  badge?: 'chats' | 'orders';
 };
 export type NavGroup = { title: string; items: NavItem[] };
 
@@ -15,6 +15,7 @@ export const NAV: NavGroup[] = [
     title: 'التشغيل',
     items: [
       { route: 'overview', label: 'نظرة عامة', icon: LayoutDashboard },
+      { route: 'orders', label: 'طلبات المتجر', icon: Inbox, badge: 'orders' },
       { route: 'calendar', label: 'التقويم والحجوزات', icon: CalendarCheck },
       { route: 'chats', label: 'المحادثات', icon: MessagesSquare, badge: 'chats' },
     ],
@@ -30,7 +31,7 @@ export const NAV: NavGroup[] = [
 ];
 
 /** Sections that need a live store: hidden until the owner approves the vendor. */
-export const PENDING_HIDDEN_ROUTES = ['calendar', 'chats'];
+export const PENDING_HIDDEN_ROUTES = ['orders', 'calendar', 'chats'];
 
 export function labelForRoute(route: string): string {
   for (const group of NAV) {

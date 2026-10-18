@@ -3,7 +3,7 @@ import { AlertTriangle, CalendarCheck, CalendarOff, ExternalLink, Package, Walle
 import { storefront, workspace } from '../api/endpoints.ts';
 import { useResource } from '../lib/useResource.ts';
 import { count, dayKey, dayLabel, sar, sarCompact, shortDate } from '../lib/format.ts';
-import { CATEGORY_LABEL, isRevenueBooking, labelFor } from '../lib/labels.ts';
+import { CATEGORY_LABEL, bookingStatusLabel, isRevenueBooking, labelFor } from '../lib/labels.ts';
 import { navigate } from '../lib/router.ts';
 import { Badge, Button, Card, CardHeader, EmptyState, ErrorNote, PageHeader } from '../components/ui/primitives.tsx';
 import { StatTile } from '../components/ui/StatTile.tsx';
@@ -191,7 +191,7 @@ export function Overview() {
                     {shortDate(booking.date)} · {booking.city} · {count(booking.guestCount)} ضيف
                   </span>
                 </span>
-                <Badge>{booking.status}</Badge>
+                <Badge>{bookingStatusLabel(booking.status)}</Badge>
                 <span className="tabular text-[13px] font-semibold text-ink">{sar(booking.totalAmount)}</span>
               </li>
             ))}

@@ -21,7 +21,7 @@ export class ApiError extends Error {
   }
 }
 
-const NETWORK_DOWN = 'تعذر الوصول للخادم. تأكد أن الواجهة الخلفية تعمل على المنفذ 43147.';
+const NETWORK_DOWN = 'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.';
 const UNREADABLE = 'رد الخادم غير مفهوم.';
 
 type Envelope = { success?: boolean; error?: string; message?: string };

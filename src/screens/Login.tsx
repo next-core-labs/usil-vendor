@@ -84,19 +84,20 @@ export function Login() {
                 <Store size={20} />
               </span>
               <h2 className="text-xl font-semibold text-ink">تسجيل الدخول</h2>
-              <p className="mt-1 text-sm text-ink-secondary">ادخل ببريد حسابك في يوصل.</p>
+              <p className="mt-1 text-sm text-ink-secondary">ادخل ببريد حسابك في يوصل أو رقم جوالك.</p>
             </div>
 
             <div className="space-y-4">
-              <Field label="البريد الإلكتروني">
+              <Field label="البريد الإلكتروني أو رقم الجوال">
                 <Input
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   dir="ltr"
                   autoComplete="username"
                   required
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
-                  placeholder="vendor@usil.app"
+                  placeholder="vendor@usil.app / 05xxxxxxxx"
                   className="text-start"
                 />
               </Field>

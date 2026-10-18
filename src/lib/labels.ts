@@ -92,6 +92,23 @@ export const BOOKING_STATUSES = ['مؤكد', 'قيد التنفيذ', 'مكتم�
 export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 /**
+ * Bookings from the storefront hub carry core's English keys (`BookingStatus`
+ * in `usil/src/types.ts`); the vendor reads them in the same Arabic words.
+ */
+export const BOOKING_STATUS_LABEL: Record<string, string> = {
+  confirmed: 'مؤكد',
+  in_progress: 'قيد التنفيذ',
+  completed: 'مكتمل',
+  cancelled: 'ملغي',
+  pending_deposit: 'بانتظار العربون',
+};
+
+/** Arabic statuses pass through unchanged. */
+export function bookingStatusLabel(status: string | undefined | null): string {
+  return labelFor(BOOKING_STATUS_LABEL, status);
+}
+
+/**
  * Mirrors `REVENUE_BOOKING_STATUSES` in `server/vendors/vendor-store.ts`: only
  * these count toward revenue. Cancelled, rejected, pending-approval and
  * unpaid-deposit bookings do not.
