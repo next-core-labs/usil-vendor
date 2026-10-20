@@ -1,85 +1,126 @@
-import { useMemo, useState } from 'react';
-import { CalendarOff, CalendarPlus, RefreshCw, Trash2 } from 'lucide-react';
-import { blockedDates as blockedApi, bookings as bookingsApi, workspace } from '../api/endpoints.ts';
+import { useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  CalendarDays,
+  CalendarOff,
+  CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Lock,
+  RefreshCw,
+  Unlock,
+} from 'lucide-react';
+import { blockedDates as blockedApi, bookings as bookingsApi, orders as ordersApi, workspace } from '../api/endpoints.ts';
 import { errorText } from '../api/client.ts';
 import { useResource } from '../lib/useResource.ts';
-import { count, sar, shortDate } from '../lib/format.ts';
-import { BLOCKED_DATE_LABEL, BLOCKED_DATE_TYPES, BOOKING_STATUSES, bookingStatusLabel } from '../lib/labels.ts';
+import { usePoll } from '../lib/usePoll.ts';
+import { count } from '../lib/format.ts';
+import { BLOCKED_DATE_LABEL, BLOCKED_DATE_TYPES } from '../lib/labels.ts';
+import { longDayLabel, monthLabel, monthOf, riyadhToday, shiftMonth } from '../lib/riyadh.ts';
+import { buildCalendar, type CalendarEntry } from '../lib/calendarEntries.ts';
 import { useToast } from '../state/ToastContext.tsx';
 import {
   Badge,
   Button,
   Card,
-  CardHeader,
   EmptyState,
   ErrorNote,
   Field,
   Input,
   PageHeader,
   Select,
-  Textarea,
+  Skeleton,
 } from '../components/ui/primitives.tsx';
-import { DataTable, type Column } from '../components/ui/Table.tsx';
+import { FilterTabs } from '../components/ui/Table.tsx';
 import { ConfirmDialog, Modal } from '../components/ui/Modal.tsx';
-import type { BlockedDate, BlockedDateType, VendorBooking } from '../api/types.ts';
+import { MonthGrid } from '../components/calendar/MonthGrid.tsx';
+import { EntryCard } from '../components/calendar/EntryCard.tsx';
+import { ExternalBookingModal } from '../components/calendar/ExternalBookingModal.tsx';
+import type { BlockedDateType } from '../api/types.ts';
 
-const TODAY = () => new Date().toISOString().slice(0, 10);
+type View = 'month' | 'list';
 
-type BookingDraft = {
-  customerName: string;
-  customerPhone: string;
-  serviceTitle: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  city: string;
-  venueName: string;
-  guestCount: number;
-  totalAmount: number;
-  depositAmount: number;
-  notes: string;
-};
-
-function emptyBooking(): BookingDraft {
-  return {
-    customerName: '',
-    customerPhone: '',
-    serviceTitle: '',
-    date: TODAY(),
-    startTime: '18:00',
-    endTime: '23:30',
-    city: '',
-    venueName: '',
-    guestCount: 50,
-    totalAmount: 0,
-    depositAmount: 0,
-    notes: '',
-  };
-}
-
+/**
+ * التقويم — store orders and external bookings on one month, with the closed
+ * days. A conflict is two live entries holding the same listing on the same
+ * day (the rule in `server/bookings/slot-holds.ts`); the server refuses to
+ * create one, so a conflict here means data that predates the lock or an
+ * order that slipped in — the vendor resolves it by hand.
+ */
 export function Calendar() {
   const toast = useToast();
   const ws = useResource(workspace.read);
-  const [bookingOpen, setBookingOpen] = useState(false);
-  const [blockOpen, setBlockOpen] = useState(false);
-  const [draft, setDraft] = useState<BookingDraft>(emptyBooking);
-  const [block, setBlock] = useState<{ date: string; reason: string; type: BlockedDateType }>({
-    date: TODAY(),
-    reason: '',
-    type: 'full_day',
-  });
-  const [removingBooking, setRemovingBooking] = useState<VendorBooking | null>(null);
-  const [busy, setBusy] = useState(false);
+  const orders = useResource(ordersApi.list);
+  usePoll(() => {
+    void ws.reload();
+    void orders.reload();
+  }, 60_000);
 
-  /** Newest event first — the vendor plans forward from today, not from the oldest row. */
-  const bookingRows = useMemo(
-    () => [...(ws.data?.bookings || [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [ws.data],
+  const [today] = useState(riyadhToday);
+  const [month, setMonth] = useState(() => monthOf(today));
+  const [selected, setSelected] = useState(today);
+  const [view, setView] = useState<View>('month');
+
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingDate, setBookingDate] = useState(today);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [block, setBlock] = useState<{ reason: string; type: BlockedDateType }>({ reason: '', type: 'full_day' });
+  const [removing, setRemoving] = useState<CalendarEntry | null>(null);
+  const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const listings = useMemo(() => ws.data?.listings || [], [ws.data]);
+  const calendar = useMemo(
+    () => buildCalendar(orders.data || [], ws.data?.bookings || [], ws.data?.blockedDates || []),
+    [orders.data, ws.data],
   );
-  const blockedRows = useMemo(
-    () => [...(ws.data?.blockedDates || [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [ws.data],
-  );
+
+  const dayEntries = calendar.byDate.get(selected) || [];
+  const dayBlocked = calendar.blockedByDate.get(selected);
+  const dayConflict = calendar.conflictDates.has(selected);
+  const dayPast = selected < today;
+
+  const monthDays = useMemo(() => {
+    const keys = new Set<string>();
+    for (const key of calendar.byDate.keys()) if (key.startsWith(month)) keys.add(key);
+    for (const key of calendar.blockedByDate.keys()) if (key.startsWith(month)) keys.add(key);
+    return Array.from(keys).sort();
+  }, [calendar, month]);
+
+  const monthStats = useMemo(() => {
+    let orderCount = 0;
+    let manualCount = 0;
+    let conflicts = 0;
+    for (const day of monthDays) {
+      for (const entry of calendar.byDate.get(day) || []) {
+        if (!entry.holdsDate) continue;
+        if (entry.kind === 'order') orderCount += 1;
+        else manualCount += 1;
+      }
+      if (calendar.conflictDates.has(day)) conflicts += 1;
+    }
+    return { orderCount, manualCount, conflicts };
+  }, [calendar, monthDays]);
+
+  function goMonth(next: string) {
+    setMonth(next);
+    setSelected(next === monthOf(today) ? today : `${next}-01`);
+  }
+
+  function goToday() {
+    setMonth(monthOf(today));
+    setSelected(today);
+  }
+
+  function selectDay(day: string, reveal = false) {
+    setSelected(day);
+    if (monthOf(day) !== month) setMonth(monthOf(day));
+    // Below `lg` the day panel sits under the month — bring it into view.
+    if (reveal && window.matchMedia('(max-width: 1023px)').matches) {
+      requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+  }
 
   async function run(action: () => Promise<unknown>, done: string) {
     setBusy(true);
@@ -96,384 +137,301 @@ export function Calendar() {
     }
   }
 
-  async function addBooking() {
+  function openBooking(date: string) {
+    setBookingDate(date);
+    setBookingOpen(true);
+  }
+
+  async function blockDay() {
     const ok = await run(
-      () =>
-        bookingsApi.create({
-          ...draft,
-          // The server recomputes this (total − deposit) and owns the id and number.
-          remainingAmount: Math.max(0, draft.totalAmount - draft.depositAmount),
-          source: 'vendor',
-          status: 'مؤكد',
-        }),
-      'أُضيف الحجز إلى تقويمك.',
+      () => blockedApi.create({ date: selected, reason: block.reason.trim(), type: block.type }),
+      'أُغلق اليوم — ما يستقبل حجوزات من المتجر.',
     );
     if (ok) {
-      setBookingOpen(false);
-      setDraft(emptyBooking());
-    }
-  }
-
-  async function addBlocked() {
-    const ok = await run(() => blockedApi.create(block), 'أُغلق التاريخ — ما يستقبل حجوزات.');
-    if (ok) {
       setBlockOpen(false);
-      setBlock({ date: TODAY(), reason: '', type: 'full_day' });
+      setBlock({ reason: '', type: 'full_day' });
     }
   }
 
-  const bookingColumns: Column<VendorBooking>[] = [
-    {
-      key: 'date',
-      header: 'التاريخ',
-      render: (row) => (
-        <span className="whitespace-nowrap">
-          <span className="block text-ink">{shortDate(row.date)}</span>
-          <span className="tabular block text-xs text-ink-muted" dir="ltr">
-            {row.startTime} – {row.endTime}
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: 'customer',
-      header: 'العميل',
-      render: (row) => (
-        <span className="block break-words sm:max-w-[14rem]">
-          <span className="block font-medium text-ink">{row.customerName}</span>
-          <span className="tabular block text-xs text-ink-muted" dir="ltr">
-            {row.customerPhone}
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: 'service',
-      header: 'الخدمة',
-      render: (row) => (
-        <span className="block break-words sm:max-w-xs">
-          <span className="block text-ink">{row.serviceTitle}</span>
-          <span className="block text-xs text-ink-muted">
-            {row.venueName} · {row.city} · {count(row.guestCount)} ضيف
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: 'amount',
-      header: 'المبلغ',
-      numeric: true,
-      render: (row) => (
-        <span className="whitespace-nowrap">
-          <span className="block font-medium text-ink">{sar(row.totalAmount)}</span>
-          {row.remainingAmount > 0 ? (
-            <span className="block text-xs text-ink-muted">متبقٍ {sar(row.remainingAmount)}</span>
-          ) : null}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'الحالة',
-      width: '150px',
-      render: (row) => {
-        // A hub booking's «confirmed» selects «مؤكد»; only Arabic values are offered or written.
-        const current = bookingStatusLabel(row.status);
-        const known = BOOKING_STATUSES.includes(current as never);
-        return (
-          <Select
-            value={known ? current : ''}
-            aria-label={`حالة حجز ${row.customerName}`}
-            className="h-8 text-[13px]"
-            onChange={(event) =>
-              void run(() => bookingsApi.update(row.id, { status: event.target.value }), 'حُدّثت حالة الحجز.')
-            }
-          >
-            {known ? null : <option value="">{current}</option>}
-            {BOOKING_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </Select>
-        );
-      },
-    },
-    {
-      key: 'actions',
-      header: '',
-      width: '56px',
-      render: (row) => (
-        <span className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={`حذف حجز ${row.customerName}`}
-            title="حذف"
-            icon={<Trash2 size={15} />}
-            onClick={() => setRemovingBooking(row)}
-          />
-        </span>
-      ),
-    },
-  ];
+  const loading = ws.loading || orders.loading;
 
-  const blockedColumns: Column<BlockedDate>[] = [
-    { key: 'date', header: 'التاريخ', render: (row) => shortDate(row.date) },
-    { key: 'type', header: 'النوع', render: (row) => <Badge>{BLOCKED_DATE_LABEL[row.type]}</Badge> },
-    {
-      key: 'reason',
-      header: 'السبب',
-      render: (row) => <span className="block break-words text-ink-secondary sm:max-w-md">{row.reason}</span>,
-    },
-    {
-      key: 'actions',
-      header: '',
-      width: '56px',
-      render: (row) => (
-        <span className="flex justify-end">
+  const dayPanel = (
+    <Card>
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-ink">{longDayLabel(selected)}</h2>
+          <p className="mt-0.5 text-[13px] text-ink-secondary">
+            {dayEntries.length ? `${count(dayEntries.length)} حجز في هذا اليوم` : 'ما فيه حجوزات في هذا اليوم'}
+          </p>
+        </div>
+        {selected === today ? <Badge tone="accent">اليوم</Badge> : null}
+      </header>
+
+      {dayBlocked ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5">
+          <Lock size={15} className="shrink-0 text-ink-muted" aria-hidden />
+          <p className="min-w-0 flex-1 text-[13px] text-ink">
+            يوم مغلق · {BLOCKED_DATE_LABEL[dayBlocked.type] || dayBlocked.type}
+            {dayBlocked.reason ? ` — ${dayBlocked.reason}` : ''}
+          </p>
           <Button
-            variant="ghost"
             size="sm"
-            aria-label={`فتح ${row.date}`}
-            title="إلغاء الإغلاق"
-            icon={<Trash2 size={15} />}
-            onClick={() => void run(() => blockedApi.remove(row.id), 'فُتح التاريخ من جديد.')}
-          />
-        </span>
-      ),
-    },
-  ];
+            variant="secondary"
+            icon={<Unlock size={14} />}
+            busy={busy}
+            onClick={() => void run(() => blockedApi.remove(dayBlocked.id), 'فُتح اليوم للحجز من جديد.')}
+          >
+            فتح اليوم
+          </Button>
+        </div>
+      ) : null}
+
+      {dayConflict ? (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-[color-mix(in_srgb,var(--critical)_30%,transparent)] bg-[var(--critical-wash)] px-3 py-2.5">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[var(--critical)]" aria-hidden />
+          <p className="text-[13px] leading-6 text-ink">
+            حجزين على نفس المنتج في هذا اليوم — المنتج يخدم مناسبة واحدة في اليوم. غيّر تاريخ أحدهما أو ألغِه.
+          </p>
+        </div>
+      ) : null}
+
+      {dayBlocked && dayEntries.some((entry) => entry.holdsDate) ? (
+        <p className="mb-3 text-xs text-ink-muted">اليوم مغلق وعليه حجوزات قائمة — الإغلاق يمنع الحجوزات الجديدة فقط.</p>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          icon={<CalendarPlus size={15} />}
+          disabled={dayPast || Boolean(dayBlocked)}
+          title={dayPast ? 'اليوم مضى' : dayBlocked ? 'افتح اليوم أولاً' : undefined}
+          onClick={() => openBooking(selected)}
+        >
+          حجز خارجي لهذا اليوم
+        </Button>
+        {!dayBlocked ? (
+          <Button
+            size="sm"
+            icon={<CalendarOff size={15} />}
+            disabled={dayPast}
+            title={dayPast ? 'اليوم مضى' : undefined}
+            onClick={() => setBlockOpen(true)}
+          >
+            إغلاق اليوم
+          </Button>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : dayEntries.length ? (
+        <ul className="space-y-2">
+          {dayEntries.map((entry) => (
+            <EntryCard
+              key={entry.key}
+              entry={entry}
+              busy={busy}
+              onStatus={(id, status) => void run(() => bookingsApi.update(id, { status }), 'حُدّثت حالة الحجز.')}
+              onDelete={setRemoving}
+            />
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          icon={<CalendarDays size={24} />}
+          title={dayBlocked ? 'يوم مغلق' : dayPast ? 'يوم مضى بدون حجوزات' : 'اليوم متاح'}
+          body={dayBlocked || dayPast ? undefined : 'سجّل حجزاً خارجياً عشان يقفل اليوم لمنتجك في المتجر.'}
+        />
+      )}
+    </Card>
+  );
 
   return (
     <>
       <PageHeader
         title="التقويم والحجوزات"
-        subtitle="حجوزاتك المسجّلة يدوياً والأيام المغلقة عندك."
+        subtitle="طلبات المتجر وحجوزاتك الخارجية والأيام المغلقة في تقويم واحد."
         action={
-          <Button
-            size="sm"
-            variant="ghost"
-            busy={ws.refreshing}
-            icon={<RefreshCw size={15} />}
-            onClick={() => void ws.reload()}
-          >
-            تحديث
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              busy={ws.refreshing || orders.refreshing}
+              icon={<RefreshCw size={15} />}
+              onClick={() => {
+                void ws.reload();
+                void orders.reload();
+              }}
+            >
+              تحديث
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<CalendarPlus size={15} />}
+              onClick={() => openBooking(selected >= today && !dayBlocked ? selected : today)}
+            >
+              حجز خارجي
+            </Button>
+          </div>
         }
       />
 
       {ws.error ? <ErrorNote message={ws.error} onRetry={() => void ws.reload()} /> : null}
+      {orders.error ? (
+        <ErrorNote message={`ما قدرنا نجيب طلبات المتجر: ${orders.error}`} onRetry={() => void orders.reload()} />
+      ) : null}
 
-      <Card padded={false}>
-        <div className="p-5 pb-0">
-          <CardHeader
-            title="الحجوزات"
-            subtitle="حجوزات تسجّلها أنت — الطلبات القادمة من المتجر تُدار من صفحة الطلبات."
-            action={
-              <Button size="sm" icon={<CalendarPlus size={15} />} onClick={() => setBookingOpen(true)}>
-                حجز جديد
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="min-w-0 lg:col-span-2">
+          <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="الشهر السابق"
+                icon={<ChevronRight size={16} />}
+                onClick={() => goMonth(shiftMonth(month, -1))}
+              />
+              <h2 className="min-w-[8.5rem] text-center text-base font-semibold text-ink">{monthLabel(month)}</h2>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="الشهر التالي"
+                icon={<ChevronLeft size={16} />}
+                onClick={() => goMonth(shiftMonth(month, 1))}
+              />
+              <Button size="sm" variant="secondary" onClick={goToday}>
+                اليوم
               </Button>
-            }
-          />
-        </div>
-        <DataTable
-          columns={bookingColumns}
-          rows={bookingRows}
-          rowKey={(row) => row.id}
-          loading={ws.loading}
-          empty={
+            </div>
+            <FilterTabs<View>
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'month', label: 'الشهر' },
+                { value: 'list', label: 'قائمة' },
+              ]}
+            />
+          </header>
+
+          <p className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-secondary">
+            <span>{count(monthStats.orderCount)} طلب متجر</span>
+            <span>{count(monthStats.manualCount)} حجز خارجي</span>
+            {monthStats.conflicts ? (
+              <span className="inline-flex items-center gap-1 text-[var(--critical)]">
+                <AlertTriangle size={12} aria-hidden />
+                {count(monthStats.conflicts)} يوم فيه تعارض
+              </span>
+            ) : null}
+          </p>
+
+          {loading ? (
+            <Skeleton className="h-[26rem] w-full" />
+          ) : view === 'month' ? (
+            <MonthGrid month={month} today={today} selected={selected} calendar={calendar} onSelect={(day) => selectDay(day, true)} />
+          ) : monthDays.length ? (
+            <ol className="space-y-4">
+              {monthDays.map((day) => {
+                const entries = calendar.byDate.get(day) || [];
+                const blocked = calendar.blockedByDate.get(day);
+                return (
+                  <li key={day}>
+                    <button
+                      type="button"
+                      onClick={() => selectDay(day)}
+                      className={`mb-2 flex w-full flex-wrap items-center gap-2 text-start text-[13px] font-semibold ${
+                        day === selected ? 'text-accent' : 'text-ink'
+                      }`}
+                    >
+                      <List size={14} aria-hidden className="text-ink-muted" />
+                      {longDayLabel(day)}
+                      {day === today ? <Badge tone="accent">اليوم</Badge> : null}
+                      {blocked ? (
+                        <Badge icon={<Lock size={11} aria-hidden />}>
+                          مغلق{blocked.reason ? ` · ${blocked.reason}` : ''}
+                        </Badge>
+                      ) : null}
+                      {calendar.conflictDates.has(day) ? (
+                        <Badge tone="critical" icon={<AlertTriangle size={11} aria-hidden />}>
+                          تعارض
+                        </Badge>
+                      ) : null}
+                    </button>
+                    {entries.length ? (
+                      <ul className="space-y-2">
+                        {entries.map((entry) => (
+                          <EntryCard
+                            key={entry.key}
+                            entry={entry}
+                            busy={busy}
+                            onStatus={(id, status) =>
+                              void run(() => bookingsApi.update(id, { status }), 'حُدّثت حالة الحجز.')
+                            }
+                            onDelete={setRemoving}
+                          />
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
             <EmptyState
-              icon={<CalendarPlus size={26} />}
-              title="التقويم فاضي"
-              body="سجّل حجزاً يدوياً عشان يحجز اليوم في تقويمك ويمنع التعارض."
+              icon={<CalendarDays size={26} />}
+              title="الشهر فاضي"
+              body="ما فيه طلبات ولا حجوزات ولا أيام مغلقة في هذا الشهر."
             />
-          }
-        />
-      </Card>
+          )}
+        </Card>
 
-      <Card padded={false}>
-        <div className="p-5 pb-0">
-          <CardHeader
-            title="أيام مغلقة"
-            subtitle="أيام ما تستقبل فيها حجوزات — إجازة أو صيانة أو ارتباط."
-            action={
-              <Button size="sm" icon={<CalendarOff size={15} />} onClick={() => setBlockOpen(true)}>
-                إغلاق تاريخ
-              </Button>
-            }
-          />
+        <div ref={panelRef} className="min-w-0 scroll-mt-4">
+          {dayPanel}
         </div>
-        <DataTable
-          columns={blockedColumns}
-          rows={blockedRows}
-          rowKey={(row) => row.id}
-          loading={ws.loading}
-          empty={<EmptyState title="ما عندك أيام مغلقة" body="كل الأيام مفتوحة للحجز حالياً." />}
-        />
-      </Card>
+      </div>
 
-      <Modal
+      <ExternalBookingModal
         open={bookingOpen}
+        initialDate={bookingDate}
+        listings={listings}
+        calendar={calendar}
         onClose={() => setBookingOpen(false)}
-        title="حجز جديد"
-        description="الاسم ورقم الجوال مطلوبان — الباقي يساعدك على منع التعارض."
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setBookingOpen(false)} disabled={busy}>
-              إلغاء
-            </Button>
-            <Button
-              variant="primary"
-              busy={busy}
-              disabled={!draft.customerName.trim() || !draft.customerPhone.trim()}
-              onClick={() => void addBooking()}
-            >
-              إضافة الحجز
-            </Button>
-          </>
-        }
-      >
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="اسم العميل">
-            <Input
-              value={draft.customerName}
-              onChange={(event) => setDraft({ ...draft, customerName: event.target.value })}
-            />
-          </Field>
-          <Field label="جوال العميل">
-            <Input
-              dir="ltr"
-              inputMode="tel"
-              className="tabular text-start"
-              placeholder="05xxxxxxxx"
-              value={draft.customerPhone}
-              onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })}
-            />
-          </Field>
-        </div>
-
-        <Field label="الخدمة">
-          <Input
-            placeholder="ركن قهوة، بوفيه، تنسيق…"
-            value={draft.serviceTitle}
-            onChange={(event) => setDraft({ ...draft, serviceTitle: event.target.value })}
-          />
-        </Field>
-
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="التاريخ">
-            <Input
-              type="date"
-              className="tabular"
-              value={draft.date}
-              onChange={(event) => setDraft({ ...draft, date: event.target.value })}
-            />
-          </Field>
-          <Field label="من">
-            <Input
-              type="time"
-              className="tabular"
-              value={draft.startTime}
-              onChange={(event) => setDraft({ ...draft, startTime: event.target.value })}
-            />
-          </Field>
-          <Field label="إلى">
-            <Input
-              type="time"
-              className="tabular"
-              value={draft.endTime}
-              onChange={(event) => setDraft({ ...draft, endTime: event.target.value })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="المدينة">
-            <Input
-              value={draft.city}
-              onChange={(event) => setDraft({ ...draft, city: event.target.value })}
-            />
-          </Field>
-          <Field label="المقر">
-            <Input
-              value={draft.venueName}
-              onChange={(event) => setDraft({ ...draft, venueName: event.target.value })}
-            />
-          </Field>
-          <Field label="عدد الضيوف">
-            <Input
-              type="number"
-              min={1}
-              className="tabular"
-              value={draft.guestCount || ''}
-              onChange={(event) => setDraft({ ...draft, guestCount: Number(event.target.value) })}
-            />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="إجمالي المبلغ">
-            <Input
-              type="number"
-              min={0}
-              className="tabular"
-              value={draft.totalAmount || ''}
-              onChange={(event) => setDraft({ ...draft, totalAmount: Number(event.target.value) })}
-            />
-          </Field>
-          <Field
-            label="العربون المستلم"
-            hint={`المتبقي: ${sar(Math.max(0, draft.totalAmount - draft.depositAmount))}`}
-          >
-            <Input
-              type="number"
-              min={0}
-              className="tabular"
-              value={draft.depositAmount || ''}
-              onChange={(event) => setDraft({ ...draft, depositAmount: Number(event.target.value) })}
-            />
-          </Field>
-        </div>
-
-        <Field label="ملاحظات">
-          <Textarea
-            rows={2}
-            value={draft.notes}
-            onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-          />
-        </Field>
-      </Modal>
+        onSaved={(booking) => {
+          setBookingOpen(false);
+          toast.success(`سُجّل حجز ${booking.customerName} وانقفل اليوم في تقويمك.`);
+          selectDay(booking.date);
+          void ws.reload();
+        }}
+      />
 
       <Modal
         open={blockOpen}
         onClose={() => setBlockOpen(false)}
-        title="إغلاق تاريخ"
-        description="اليوم المغلق يظهر لك في التقويم كيوم غير متاح."
+        title="إغلاق اليوم"
+        description={`${longDayLabel(selected)} — اليوم المغلق ما يستقبل حجوزات من المتجر ولا حجوزات خارجية.`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setBlockOpen(false)} disabled={busy}>
               إلغاء
             </Button>
-            <Button variant="primary" busy={busy} disabled={!block.date} onClick={() => void addBlocked()}>
-              إغلاق التاريخ
+            <Button variant="primary" busy={busy} onClick={() => void blockDay()}>
+              إغلاق اليوم
             </Button>
           </>
         }
       >
-        <Field label="التاريخ">
-          <Input
-            type="date"
-            className="tabular"
-            value={block.date}
-            onChange={(event) => setBlock({ ...block, date: event.target.value })}
-          />
-        </Field>
+        {dayEntries.some((entry) => entry.holdsDate) ? (
+          <p className="rounded-lg border border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[var(--warning-wash)] px-3 py-2 text-[13px] text-ink">
+            عليه {count(dayEntries.filter((entry) => entry.holdsDate).length)} حجز قائم — الإغلاق ما يلغيها.
+          </p>
+        ) : null}
         <Field label="النوع">
-          <Select
-            value={block.type}
-            onChange={(event) => setBlock({ ...block, type: event.target.value as BlockedDateType })}
-          >
+          <Select value={block.type} onChange={(event) => setBlock({ ...block, type: event.target.value as BlockedDateType })}>
             {BLOCKED_DATE_TYPES.map((type) => (
               <option key={type} value={type}>
                 {BLOCKED_DATE_LABEL[type]}
@@ -491,18 +449,18 @@ export function Calendar() {
       </Modal>
 
       <ConfirmDialog
-        open={Boolean(removingBooking)}
+        open={Boolean(removing)}
         title="حذف الحجز؟"
-        body={`حجز «${removingBooking?.customerName || ''}» يُحذف من تقويمك ويُفتح اليوم للحجز.`}
+        body={`حجز «${removing?.customer || ''}» يُحذف من تقويمك ويُفتح اليوم للحجز.`}
         confirmLabel="حذف"
         danger
         busy={busy}
         onConfirm={async () => {
-          if (!removingBooking) return;
-          const ok = await run(() => bookingsApi.remove(removingBooking.id), 'حُذف الحجز.');
-          if (ok) setRemovingBooking(null);
+          if (!removing || removing.kind !== 'manual') return;
+          const ok = await run(() => bookingsApi.remove(removing.booking.id), 'حُذف الحجز.');
+          if (ok) setRemoving(null);
         }}
-        onCancel={() => setRemovingBooking(null)}
+        onCancel={() => setRemoving(null)}
       />
     </>
   );

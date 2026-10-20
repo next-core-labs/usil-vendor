@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
-import { CalendarDays, Check, CheckCircle2, Clock, Inbox, MapPin, MessageCircle, Phone, PlayCircle, RefreshCw, X } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { CalendarDays, Check, CheckCircle2, ChevronDown, Clock, Inbox, MapPin, MessageCircle, MessageSquareText, Phone, PlayCircle, RefreshCw, X } from 'lucide-react';
 import { orders as ordersApi } from '../api/endpoints.ts';
+import { office } from '../api/office.ts';
+import { brandFromOffice } from '../api/finance.ts';
+import { CLIENT_TEMPLATES, fillTemplate, whatsappChatUrl } from '../lib/whatsappTemplates.ts';
 import type { PlatformOrder } from '../api/types.ts';
 import { errorText } from '../api/client.ts';
 import { Badge, Button, Card, EmptyState, ErrorNote, Field, PageHeader, TableSkeleton, Textarea, type Tone } from '../components/ui/primitives.tsx';
@@ -42,6 +45,99 @@ function whatsappUrl(phone: string, text: string): string | null {
   return intl ? `https://wa.me/${intl}?text=${encodeURIComponent(text)}` : null;
 }
 
+/** The ready-made client messages (`lib/whatsappTemplates.ts`) filled for one order. */
+function orderMessages(order: PlatformOrder, brand: string): Array<{ id: string; label: string; url: string }> {
+  const paid = order.paymentStatus === 'paid';
+  const values = {
+    name: order.name,
+    brand,
+    service: order.serviceName || order.items?.[0]?.title || '',
+    date: order.eventDate,
+    time: order.eventTime,
+    venue: order.city,
+    city: order.city,
+    bookingNumber: order.id,
+    amount: order.totalAmount,
+    remaining: paid ? 0 : order.totalAmount,
+  };
+  return CLIENT_TEMPLATES
+    // A paid store order has nothing left to collect.
+    .filter((template) => !(paid && template.id === 'remaining'))
+    .map((template) => {
+      let text = fillTemplate(template.body, values);
+      if (template.id === 'remaining' && order.paymentUrl) text += `\nرابط الدفع: ${order.paymentUrl}`;
+      return { id: template.id, label: template.label, url: whatsappChatUrl(order.phone, text) };
+    })
+    .filter((message) => Boolean(message.url));
+}
+
+/** A small menu of ready-made WhatsApp messages; each opens wa.me with the text filled in. */
+function WhatsAppTemplatesMenu({ order, brand }: { order: PlatformOrder; brand: string }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const messages = open ? orderMessages(order, brand) : [];
+  if (!whatsappChatUrl(order.phone)) return null;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex items-center gap-1 hover:text-accent"
+      >
+        <MessageSquareText size={14} />
+        رسائل جاهزة
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open ? (
+        <div
+          id={menuId}
+          role="menu"
+          className="absolute start-0 top-full z-20 mt-1.5 w-56 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-[var(--shadow-pop)]"
+        >
+          {messages.map((message) => (
+            <a
+              key={message.id}
+              role="menuitem"
+              href={message.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3 py-2 text-[13px] text-ink transition-colors hover:bg-sunken"
+            >
+              <MessageCircle size={14} className="shrink-0 text-ink-muted" />
+              {message.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * طلبات المتجر — orders customers placed on usil.app for this vendor's
  * products. Approval-mode orders wait here unpaid: accepting one sends the
@@ -52,6 +148,9 @@ export function Orders() {
   const { refreshOrders } = useUnread();
   const resource = useResource(() => ordersApi.list(), []);
   usePoll(() => void resource.reload(), 60_000);
+  // Only signs the WhatsApp messages; without it they read «فريقنا».
+  const brandRes = useResource(() => office.read().then((data) => brandFromOffice(data).brandName), []);
+  const brandName = brandRes.data || '';
   const rows = resource.data ?? [];
   const pendingCount = rows.filter((row) => row.status === PENDING).length;
   const [filter, setFilter] = useState<Filter>('pending');
@@ -253,6 +352,7 @@ export function Orders() {
                           واتساب
                         </a>
                       ) : null}
+                      <WhatsAppTemplatesMenu order={order} brand={brandName} />
                       <span className="tabular font-semibold text-ink">{sar(order.totalAmount)}</span>
                     </div>
 

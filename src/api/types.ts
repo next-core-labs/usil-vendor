@@ -22,6 +22,8 @@ export type PublicUser = {
 export type FulfillmentLane = 'hour' | 'same_day' | 'tomorrow' | 'instant';
 export type BookingMode = 'instant' | 'approval';
 export type PriceUnit = 'للمناسبة' | 'للساعة' | 'للشخص' | 'لليوم' | 'للوحدة';
+/** `LISTING_AUDIENCE_IDS` in `server/vendors/vendor-listings.ts`. */
+export type ListingAudience = 'women' | 'men' | 'family' | 'corporate';
 
 /** `server/vendors/vendor-listings.ts` → `VendorListing`. */
 export type VendorListing = {
@@ -39,6 +41,8 @@ export type VendorListing = {
   /** Legacy single-image field the server mirrors from `images[0]`. */
   image?: string;
   fulfillment: FulfillmentLane[];
+  /** Empty or missing: suits every audience. */
+  audiences?: ListingAudience[];
   bookingMode: BookingMode;
   createdAt: string;
   updatedAt: string;
@@ -54,18 +58,21 @@ export type ListingDraft = {
   cities: string[];
   images: string[];
   fulfillment: FulfillmentLane[];
+  /** Empty = everyone in the store's «الجمهور» filter. */
+  audiences: ListingAudience[];
   bookingMode: BookingMode;
 };
 
 /* ── Calendar ───────────────────────────────────────────────────────── */
 
-/** `server/vendors/vendor-store.ts` → `VendorBookingRecord`. */
 /** A store order as `GET /api/bookings` returns it to a vendor (only this vendor's lines). */
 export type PlatformOrder = {
   id: string;
   name: string;
   phone: string;
   email?: string;
+  /** The headline listing; cleared when it is another vendor's line. */
+  serviceId?: string;
   serviceName: string;
   notes?: string;
   city?: string;
@@ -78,9 +85,11 @@ export type PlatformOrder = {
   paymentStatus: 'unpaid' | 'paid';
   /** Moyasar pay link, set once the client can pay. */
   paymentUrl?: string;
+  /** UTC `YYYY-MM-DD HH:mm`. */
   createdAt?: string;
 };
 
+/** `server/vendors/vendor-store.ts` → `VendorBookingRecord`. */
 export type VendorBooking = {
   id: string;
   bookingNumber: string;
@@ -296,3 +305,15 @@ type ConversationBase = {
 export type ConversationSummary = ConversationBase & { lastMessage: ChatMessage | null; unread: number };
 
 export type Conversation = ConversationBase & { messages: ChatMessage[] };
+
+/** A vendor workspace a supervisor can open (`GET /api/admin/vendor-hubs`). */
+export type VendorHubRow = {
+  vendorId: string;
+  name: string;
+  projectName: string;
+  email: string;
+  status: 'approved' | 'pending' | 'rejected';
+  listingCount: number;
+  bookingCount: number;
+  isOwn: boolean;
+};

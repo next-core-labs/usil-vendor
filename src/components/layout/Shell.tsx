@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { LogOut, Menu, Monitor, Moon, Sun, X } from 'lucide-react';
+import { ArrowLeftRight, Eye, LogOut, Menu, Monitor, Moon, Sun, X } from 'lucide-react';
 import { NAV, PENDING_HIDDEN_ROUTES, labelForRoute } from './nav.ts';
 import { PendingBanner } from './PendingBanner.tsx';
 import { VerifyEmailBanner } from './VerifyEmailBanner.tsx';
@@ -11,6 +11,7 @@ import { ROLE_LABEL } from '../../lib/labels.ts';
 import { count, initials } from '../../lib/format.ts';
 import { useUnread } from '../../state/UnreadContext.tsx';
 import { Button } from '../ui/primitives.tsx';
+import { UsilMark } from '../ui/UsilMark.tsx';
 
 const THEMES: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
   { value: 'light', label: 'فاتح', icon: Sun },
@@ -105,9 +106,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 function Brand() {
   return (
     <div className="flex items-center gap-2.5 border-b border-line px-5 py-4">
-      <span className="grid size-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-ink">
-        يو
-      </span>
+      <UsilMark className="size-8" />
       <div className="leading-tight">
         <p className="text-sm font-semibold text-ink">يوصل</p>
         <p className="text-[11px] text-ink-muted">لوحة المورّد</p>
@@ -119,7 +118,7 @@ function Brand() {
 export function Shell({ children }: { children: ReactNode }) {
   const route = useRoute();
   const { user, signOut } = useSession();
-  const { mode } = useAccount();
+  const { mode, supervised, leaveVendor } = useAccount();
   const [drawer, setDrawer] = useState(false);
 
   // The drawer is a mobile affordance; a route change must always close it.
@@ -196,6 +195,18 @@ export function Shell({ children }: { children: ReactNode }) {
             />
           </div>
         </header>
+
+        {supervised ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[color-mix(in_srgb,var(--warning)_40%,transparent)] bg-[var(--warning-wash)] px-4 py-2 sm:px-6">
+            <p className="flex items-center gap-2 text-[13px] text-ink">
+              <Eye size={15} />
+              تتصفّح لوحة المورّد «{supervised.name || supervised.vendorId}» كمشرف — أي تعديل يُحفظ لهذا المورّد.
+            </p>
+            <Button size="sm" icon={<ArrowLeftRight size={14} />} onClick={leaveVendor}>
+              تبديل المورّد
+            </Button>
+          </div>
+        ) : null}
 
         <main className="mx-auto w-full max-w-[1400px] flex-1 space-y-6 p-4 sm:p-6">
           <VerifyEmailBanner />

@@ -19,6 +19,7 @@ import type {
   VendorApplicationRow,
   VendorDetailsDraft,
   VendorWorkspace,
+  VendorHubRow,
 } from './types.ts';
 
 type Listed<T> = { data: T[] };
@@ -168,4 +169,9 @@ export const chats = {
   send: (id: string, body: string) =>
     api.post<Wrapped<ChatMessage>>(`/api/chats/${encodeURIComponent(id)}/messages`, { body }).then((r) => r.data),
   markRead: (id: string) => api.post<unknown>(`/api/chats/${encodeURIComponent(id)}/read`),
+};
+
+/** Supervisors (admin, accounts manager) pick which vendor's dashboard to open. */
+export const supervision = {
+  hubs: () => api.get<Listed<VendorHubRow>>('/api/admin/vendor-hubs').then((r) => r.data),
 };
