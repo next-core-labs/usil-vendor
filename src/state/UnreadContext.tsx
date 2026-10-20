@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { chats, orders } from '../api/endpoints.ts';
 import { usePoll } from '../lib/usePoll.ts';
-import { useSession } from './SessionContext.tsx';
+import { isVendorAccount, useSession } from './SessionContext.tsx';
 
 /**
  * The unread-message count behind the sidebar «المحادثات» badge. Kept in one
@@ -32,6 +32,8 @@ const PENDING_APPROVAL = 'بانتظار موافقة المورّد';
 export function UnreadProvider({ children }: { children: ReactNode }) {
   const { user } = useSession();
   const enabled = user?.role === 'vendor';
+  // Orders are scoped by ?vendorId= for a supervisor, so their badge is the supervised vendor's.
+  const ordersEnabled = isVendorAccount(user);
   const [chatUnread, setChatUnread] = useState(0);
   const [ordersWaiting, setOrdersWaiting] = useState(0);
 
@@ -46,13 +48,13 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
   }, [enabled]);
 
   const loadOrders = useCallback(async () => {
-    if (!enabled) {
+    if (!ordersEnabled) {
       setOrdersWaiting(0);
       return;
     }
     const rows = await orders.list().catch(() => null);
     if (rows) setOrdersWaiting(rows.filter((row) => row.status === PENDING_APPROVAL).length);
-  }, [enabled]);
+  }, [ordersEnabled]);
 
   useEffect(() => {
     void loadChats();
@@ -60,7 +62,7 @@ export function UnreadProvider({ children }: { children: ReactNode }) {
   }, [loadChats, loadOrders]);
 
   usePoll(() => void loadChats(), CHAT_POLL_MS, enabled);
-  usePoll(() => void loadOrders(), ORDER_POLL_MS, enabled);
+  usePoll(() => void loadOrders(), ORDER_POLL_MS, ordersEnabled);
 
   // Stable, because the chat screen's read handler depends on it.
   const refreshChats = useCallback(() => void loadChats(), [loadChats]);

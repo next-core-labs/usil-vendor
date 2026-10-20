@@ -16,6 +16,14 @@ import { Storefront } from './screens/Storefront.tsx';
 import { Socials } from './screens/Socials.tsx';
 import { Chats } from './screens/Chats.tsx';
 import { Orders } from './screens/Orders.tsx';
+import { VendorPicker } from './screens/VendorPicker.tsx';
+import { Contracts } from './screens/Contracts.tsx';
+import { Quotations } from './screens/Quotations.tsx';
+import { Earnings } from './screens/Earnings.tsx';
+import { Invoices } from './screens/Invoices.tsx';
+import { Expenses } from './screens/Expenses.tsx';
+import { Inventory } from './screens/Inventory.tsx';
+import { Brand } from './screens/Brand.tsx';
 
 function Screen() {
   const route = useRoute();
@@ -29,6 +37,20 @@ function Screen() {
   switch (route) {
     case 'orders':
       return <Orders />;
+    case 'contracts':
+      return <Contracts />;
+    case 'quotations':
+      return <Quotations />;
+    case 'earnings':
+      return <Earnings />;
+    case 'invoices':
+      return <Invoices />;
+    case 'expenses':
+      return <Expenses />;
+    case 'inventory':
+      return <Inventory />;
+    case 'brand':
+      return <Brand />;
     case 'listings':
       return <Listings />;
     case 'calendar':
@@ -54,12 +76,15 @@ function Spinner() {
 
 function Workspace() {
   const { user } = useSession();
-  const { mode, loading } = useAccount();
+  const { mode, loading, supervised } = useAccount();
   if (loading) return <Spinner />;
+  // A supervisor without a chosen vendor picks one first.
+  if (mode === 'pick') return <VendorPicker />;
   // Rejected, or never applied.
   if (mode === 'outside' && user) return <ApplicationStatus user={user} />;
   return (
-    <UnreadProvider>
+    // Keyed by the supervised vendor: switching vendors remounts every screen and refetches.
+    <UnreadProvider key={supervised?.vendorId || 'own'}>
       <Shell>
         <Screen />
       </Shell>

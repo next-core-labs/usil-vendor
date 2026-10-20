@@ -10,6 +10,7 @@ import {
   FULFILLMENT_LABEL,
   labelFor,
 } from '../lib/labels.ts';
+import { AUDIENCE_LABEL } from '../lib/audiences.ts';
 import { useToast } from '../state/ToastContext.tsx';
 import { useAccount } from '../state/AccountContext.tsx';
 import { Badge, Button, Card, EmptyState, ErrorNote, PageHeader } from '../components/ui/primitives.tsx';
@@ -140,6 +141,20 @@ export function Listings() {
           ))}
         </span>
       ),
+    },
+    {
+      key: 'audiences',
+      header: 'الجمهور',
+      render: (row) =>
+        row.audiences?.length ? (
+          <span className="flex flex-wrap gap-1">
+            {row.audiences.map((audience) => (
+              <Badge key={audience}>{AUDIENCE_LABEL[audience] || audience}</Badge>
+            ))}
+          </span>
+        ) : (
+          <span className="text-[13px] text-ink-muted">الجميع</span>
+        ),
     },
     {
       key: 'bookingMode',

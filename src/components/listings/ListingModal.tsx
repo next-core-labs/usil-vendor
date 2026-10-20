@@ -14,7 +14,15 @@ import {
   LISTING_MIN_IMAGES,
   PRICE_UNITS,
 } from '../../lib/labels.ts';
-import type { BookingMode, FulfillmentLane, ListingDraft, PriceUnit, VendorListing } from '../../api/types.ts';
+import { AUDIENCE_LABEL, LISTING_AUDIENCES } from '../../lib/audiences.ts';
+import type {
+  BookingMode,
+  FulfillmentLane,
+  ListingAudience,
+  ListingDraft,
+  PriceUnit,
+  VendorListing,
+} from '../../api/types.ts';
 
 function draftFrom(listing: VendorListing | null): ListingDraft {
   return {
@@ -26,6 +34,7 @@ function draftFrom(listing: VendorListing | null): ListingDraft {
     cities: listing?.cities || [],
     images: listing?.images?.length ? listing.images : listing?.image ? [listing.image] : [],
     fulfillment: listing?.fulfillment || [],
+    audiences: listing?.audiences || [],
     bookingMode: listing?.bookingMode || 'approval',
   };
 }
@@ -67,6 +76,14 @@ export function ListingModal({
       fulfillment: draft.fulfillment.includes(lane)
         ? draft.fulfillment.filter((item) => item !== lane)
         : [...draft.fulfillment, lane],
+    });
+  }
+
+  function toggleAudience(audience: ListingAudience) {
+    patch({
+      audiences: draft.audiences.includes(audience)
+        ? draft.audiences.filter((item) => item !== audience)
+        : [...draft.audiences, audience],
     });
   }
 
@@ -183,6 +200,36 @@ export function ListingModal({
           })}
         </div>
         <p className="mt-1.5 text-xs text-ink-muted">اختر مساراً واحداً على الأقل — هذي سرعة التوريد.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend className="mb-1.5 text-[13px] font-medium text-ink-secondary">الجمهور</legend>
+        <div className="flex flex-wrap gap-2">
+          {LISTING_AUDIENCES.map((audience) => {
+            const active = draft.audiences.includes(audience);
+            return (
+              <label
+                key={audience}
+                className={`cursor-pointer rounded-lg border px-3 py-2 text-[13px] transition-colors ${
+                  active
+                    ? 'border-accent bg-[var(--accent-wash)] font-medium text-accent'
+                    : 'border-line-strong bg-surface text-ink-secondary hover:border-[var(--axis)]'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => toggleAudience(audience)}
+                  className="sr-only"
+                />
+                {AUDIENCE_LABEL[audience]}
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-xs text-ink-muted">
+          لمن تقدّم هذا المنتج؟ يظهر للعميل في فلتر «الجمهور». إذا ما اخترت شيء يظهر للجميع.
+        </p>
       </fieldset>
 
       <fieldset>

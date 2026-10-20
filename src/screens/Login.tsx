@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Store, UserPlus } from 'lucide-react';
 import { useSession } from '../state/SessionContext.tsx';
 import { Button, Field, Input } from '../components/ui/primitives.tsx';
+import { UsilMark } from '../components/ui/UsilMark.tsx';
 import { ResetPassword } from './ResetPassword.tsx';
 import { Register } from './Register.tsx';
 import { navigate } from '../lib/router.ts';
@@ -39,9 +40,7 @@ export function Login() {
           style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%)' }}
         />
         <div className="relative flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-lg bg-white/15 text-sm font-bold text-white">
-            يو
-          </span>
+          <UsilMark className="size-9 ring-1 ring-white/25 rounded-lg" />
           <p className="text-base font-semibold text-white">يوصل</p>
         </div>
         <div className="relative">

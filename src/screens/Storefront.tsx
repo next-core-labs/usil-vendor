@@ -19,6 +19,7 @@ import type { ApplicationStatus } from '../api/types.ts';
 import { useAccount } from '../state/AccountContext.tsx';
 import { DetailsForm } from '../components/storefront/DetailsForm.tsx';
 import { publicStoreUrl } from '../lib/publicSite.ts';
+import { StoreQr } from '../components/brand/QrCode.tsx';
 
 const STATUS_TONE: Record<ApplicationStatus, Tone> = {
   approved: 'good',
@@ -182,7 +183,7 @@ function ApprovedStorefront() {
 
           {file ? (
             <Card>
-              <CardHeader title="رابط متجرك" subtitle="انسخه وضعه في البايو أو أرسله للعميل مباشرة." />
+              <CardHeader title="رابط متجرك" subtitle="انسخه وضعه في البايو أو أرسله للعميل مباشرة، أو حمّل رمز QR للطباعة." />
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-sunken px-3 py-2.5">
                 <code dir="ltr" className="min-w-0 flex-1 truncate text-[13px] text-ink">
                   {publicStoreUrl(file.vendorId)}
@@ -200,6 +201,9 @@ function ApprovedStorefront() {
                 >
                   نسخ
                 </Button>
+              </div>
+              <div className="mt-4 border-t border-line pt-4">
+                <StoreQr url={publicStoreUrl(file.vendorId)} fileBase={`usil-store-${file.vendorId}`} />
               </div>
             </Card>
           ) : null}

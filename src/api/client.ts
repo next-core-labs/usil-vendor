@@ -26,10 +26,32 @@ const UNREADABLE = 'رد الخادم غير مفهوم.';
 
 type Envelope = { success?: boolean; error?: string; message?: string };
 
+/**
+ * The vendor an admin or accounts manager is supervising. Every vendor-scoped
+ * call then carries `?vendorId=`, which the backend honours for supervisors
+ * only — a vendor's own session ignores it.
+ */
+let actingVendorId: string | null = null;
+
+export function setActingVendor(vendorId: string | null) {
+  actingVendorId = vendorId || null;
+}
+
+export function actingVendor(): string | null {
+  return actingVendorId;
+}
+
+const VENDOR_SCOPED = /^\/api\/(vendor\/|bookings(\/|\?|$))/;
+
+export function withActingVendor(path: string): string {
+  if (!actingVendorId || !VENDOR_SCOPED.test(path)) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}vendorId=${encodeURIComponent(actingVendorId)}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(withActingVendor(path), {
       // The session rides an HttpOnly cookie, so every call must carry it.
       credentials: 'include',
       headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
