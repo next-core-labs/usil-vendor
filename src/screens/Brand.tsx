@@ -92,7 +92,9 @@ export function Brand() {
     // These print on invoices and receive transfers, so a typo is stopped here.
     const problem = emailProblem(draft.email) || ibanProblem(draft.iban);
     if (problem) {
+      // The note sits at the top; the bottom save button would otherwise look like it did nothing.
       setFormError(problem);
+      toast.failure(problem);
       return;
     }
     if (draft.primaryColor && !isHexColor(draft.primaryColor)) {
@@ -305,7 +307,7 @@ export function Brand() {
                   <Input value={draft.accountHolder} onChange={(e) => set('accountHolder', e.target.value)} />
                 </Field>
                 <div className="sm:col-span-2">
-                  <Field label="رقم الآيبان (IBAN)" hint={ibanProblem(draft.iban) || 'يبدأ بـ SA ويتبعه 22 رقماً.'}>
+                  <Field label="رقم الآيبان (IBAN)" hint={ibanProblem(draft.iban) || 'SA ويتبعه 22 رقماً — يكفي تكتب الأرقام الـ22 ونحن نضيف SA.'}>
                     <Input
                       dir="ltr"
                       className="text-end font-mono"
