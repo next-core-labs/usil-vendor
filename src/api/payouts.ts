@@ -1,4 +1,5 @@
 import { api } from './client.ts';
+import { normalizeIban } from './brand.ts';
 
 /**
  * أرباح المتجر وطلبات السحب. The balance is computed by the server from the
@@ -71,9 +72,7 @@ export const payouts = {
   request: (draft: PayoutDraft) => api.post<Wrapped<PayoutRequest>>('/api/vendor/payouts', draft).then((r) => r.data),
 };
 
-export function normalizeIban(raw: string): string {
-  return String(raw || '').replace(/\s+/g, '').toUpperCase();
-}
+export { normalizeIban };
 
 /** Same rule the server applies: `SA` + 22 digits. */
 export function looksLikeSaudiIban(raw: string): boolean {

@@ -123,23 +123,43 @@ export function inkOnColor(hex: string): string {
 
 /* ── Field checks (from the old dashboard's vendorContactChecks) ───── */
 
+/**
+ * What vendors actually type: Arabic-keyboard digits (٠١٢…), spaces or dashes
+ * from the bank app, invisible direction marks from a copy, and often the 22
+ * digits without the `SA` — all of it becomes `SA` + 22 ASCII digits.
+ */
 export function normalizeIban(raw: string): string {
-  return String(raw || '').replace(/\s+/g, '').toUpperCase();
+  const iban = String(raw || '')
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[\s\-_.‎‏‪-‮⁦-⁩]/g, '')
+    .toUpperCase();
+  return /^\d{22}$/.test(iban) ? `SA${iban}` : iban;
 }
 
-/** Saudi IBAN: SA + 22 digits, with a valid ISO 13616 (mod 97) check. */
-export function isValidSaudiIban(raw: string): boolean {
-  const iban = normalizeIban(raw);
-  if (!/^SA\d{22}$/.test(iban)) return false;
+function ibanChecksumOk(iban: string): boolean {
   const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
   let rest = 0;
   for (const ch of digits) rest = (rest * 10 + Number(ch)) % 97;
   return rest === 1;
 }
 
+/** Saudi IBAN: SA + 22 digits, with a valid ISO 13616 (mod 97) check. */
+export function isValidSaudiIban(raw: string): boolean {
+  const iban = normalizeIban(raw);
+  return /^SA\d{22}$/.test(iban) && ibanChecksumOk(iban);
+}
+
 export function ibanProblem(raw: string): string {
-  if (!normalizeIban(raw)) return '';
-  return isValidSaudiIban(raw) ? '' : 'رقم الآيبان غير صحيح — يبدأ بـ SA ويتبعه 22 رقماً، انسخه كما هو من تطبيق البنك.';
+  const iban = normalizeIban(raw);
+  if (!iban) return '';
+  if (!/^SA\d{22}$/.test(iban)) {
+    const digits = iban.replace(/^SA/, '').replace(/\D/g, '').length;
+    return `الآيبان السعودي SA ويتبعه 22 رقماً — كاتب ${digits} رقماً.`;
+  }
+  return ibanChecksumOk(iban)
+    ? ''
+    : 'عدد الأرقام صحيح لكن الآيبان نفسه غير صحيح (فيه رقم غلط) — انسخه كما هو من تطبيق البنك.';
 }
 
 /** A Saudi VAT registration number: 15 digits, starting and ending with 3. */

@@ -153,7 +153,7 @@ export function Orders() {
   const brandName = brandRes.data || '';
   const rows = resource.data ?? [];
   const pendingCount = rows.filter((row) => row.status === PENDING).length;
-  const [filter, setFilter] = useState<Filter>('pending');
+  const [filter, setFilter] = useState<Filter>('all');
   const [action, setAction] = useState<Action | null>(null);
   const [busy, setBusy] = useState(false);
   // Shown to the client on their order, so they know why without a chat.
@@ -258,9 +258,9 @@ export function Orders() {
         value={filter}
         onChange={setFilter}
         options={[
+          { value: 'all', label: 'الكل', count: rows.length },
           { value: 'pending', label: 'بانتظار موافقتك', count: pendingCount },
           { value: 'open', label: 'الطلبات المفتوحة' },
-          { value: 'all', label: 'الكل', count: rows.length },
         ]}
       />
 
