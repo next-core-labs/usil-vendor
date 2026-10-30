@@ -51,12 +51,26 @@ function draftFrom(row: VendorApplicationRow): Draft {
   };
 }
 
+/** What an approved vendor may still send — `COMPLETION_FIELDS` on the server. */
+const COMPLETION_FIELDS = [
+  'firstName',
+  'fatherName',
+  'familyName',
+  'nationalId',
+  'bankName',
+  'iban',
+  'accountHolderName',
+  'fulfillment',
+] as const satisfies ReadonlyArray<keyof Draft>;
+
 /**
  * A pending vendor's file, editable until the owner decides. Saving partial
  * data is fine — the banner and the owner both read what is still missing —
  * but every field sent must be valid, and the server says which one is not.
+ * `approved`: the owner approved a short file; only the approval fields show,
+ * since the brand screen owns the store name and logo by then.
  */
-export function DetailsForm({ application }: { application: VendorApplicationRow }) {
+export function DetailsForm({ application, approved = false }: { application: VendorApplicationRow; approved?: boolean }) {
   const account = useAccount();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(application));
@@ -86,7 +100,11 @@ export function DetailsForm({ application }: { application: VendorApplicationRow
     setBusy(true);
     setError('');
     try {
-      await applications.saveDetails({ ...draft, ...(logo ? { logoDataUrl: logo } : {}) });
+      await applications.saveDetails(
+        approved
+          ? Object.fromEntries(COMPLETION_FIELDS.map((key) => [key, draft[key]]))
+          : { ...draft, ...(logo ? { logoDataUrl: logo } : {}) },
+      );
       setLogo('');
       await account.reload();
       toast.success('حُفظ ملفك.');
@@ -101,62 +119,72 @@ export function DetailsForm({ application }: { application: VendorApplicationRow
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <Card>
-        <CardHeader title="متجرك" subtitle="يظهر للعملاء بعد الاعتماد." />
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <span className="size-16 shrink-0 overflow-hidden rounded-xl border border-line bg-sunken">
-              {logoShown ? (
-                <img src={logoShown} alt="شعار المتجر" className="size-full object-cover" />
-              ) : (
-                <span className="grid size-full place-items-center text-ink-muted">
-                  <Building2 size={22} />
-                </span>
-              )}
-            </span>
-            <div>
-              <Button size="sm" icon={<ImagePlus size={14} />} onClick={() => logoInput.current?.click()}>
-                {logoShown ? 'غيّر الشعار' : 'أضف شعاراً'}
-              </Button>
-              <p className="mt-1 text-xs text-ink-muted">اختياري — jpg أو png أو webp حتى 2 ميغابايت.</p>
-            </div>
-            <input
-              ref={logoInput}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              hidden
-              onChange={(e) => {
-                pickLogo(e.target.files?.[0]);
-                e.target.value = '';
-              }}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="اسم المتجر">
-              <Input value={draft.projectName} onChange={(e) => set('projectName', e.target.value)} />
-            </Field>
-            <Field label="نوع المشروع">
-              <Select value={draft.projectType} onChange={(e) => set('projectType', e.target.value)}>
-                <option value="">اختر</option>
-                {PROJECT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          {draft.projectType === PROJECT_TYPE_OTHER ? (
-            <Field label="اكتب نوع مشروعك">
-              <Input value={draft.projectTypeOther} onChange={(e) => set('projectTypeOther', e.target.value)} />
-            </Field>
-          ) : null}
+      {approved ? (
+        <Card>
+          <CardHeader title="التوصيل" subtitle="المسارات اللي تقدر تخدم فيها عملاءك." />
           <Lanes value={draft.fulfillment} onChange={(next) => set('fulfillment', next)} />
-        </div>
-      </Card>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader title="متجرك" subtitle="يظهر للعملاء بعد الاعتماد." />
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <span className="size-16 shrink-0 overflow-hidden rounded-xl border border-line bg-sunken">
+                {logoShown ? (
+                  <img src={logoShown} alt="شعار المتجر" className="size-full object-cover" />
+                ) : (
+                  <span className="grid size-full place-items-center text-ink-muted">
+                    <Building2 size={22} />
+                  </span>
+                )}
+              </span>
+              <div>
+                <Button size="sm" icon={<ImagePlus size={14} />} onClick={() => logoInput.current?.click()}>
+                  {logoShown ? 'غيّر الشعار' : 'أضف شعاراً'}
+                </Button>
+                <p className="mt-1 text-xs text-ink-muted">اختياري — jpg أو png أو webp حتى 2 ميغابايت.</p>
+              </div>
+              <input
+                ref={logoInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={(e) => {
+                  pickLogo(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="اسم المتجر">
+                <Input value={draft.projectName} onChange={(e) => set('projectName', e.target.value)} />
+              </Field>
+              <Field label="نوع المشروع">
+                <Select value={draft.projectType} onChange={(e) => set('projectType', e.target.value)}>
+                  <option value="">اختر</option>
+                  {PROJECT_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            {draft.projectType === PROJECT_TYPE_OTHER ? (
+              <Field label="اكتب نوع مشروعك">
+                <Input value={draft.projectTypeOther} onChange={(e) => set('projectTypeOther', e.target.value)} />
+              </Field>
+            ) : null}
+            <Lanes value={draft.fulfillment} onChange={(next) => set('fulfillment', next)} />
+          </div>
+        </Card>
+      )}
 
       <Card>
-        <CardHeader title="بياناتك" subtitle="تراها إدارة يوصل فقط، للتحقق قبل الاعتماد." />
+        <CardHeader
+          title="بياناتك"
+          subtitle={approved ? 'تراها إدارة يوصل فقط، للتحقق من متجرك.' : 'تراها إدارة يوصل فقط، للتحقق قبل الاعتماد.'}
+        />
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="الاسم الأول">
             <Input value={draft.firstName} onChange={(e) => set('firstName', e.target.value)} />
@@ -179,14 +207,16 @@ export function DetailsForm({ application }: { application: VendorApplicationRow
               />
             </Field>
           </Wide>
-          <Field label="السجل التجاري" hint="اختياري">
-            <Input
-              dir="ltr"
-              value={draft.commercialRegister}
-              onChange={(e) => set('commercialRegister', e.target.value)}
-              className="text-start"
-            />
-          </Field>
+          {approved ? null : (
+            <Field label="السجل التجاري" hint="اختياري">
+              <Input
+                dir="ltr"
+                value={draft.commercialRegister}
+                onChange={(e) => set('commercialRegister', e.target.value)}
+                className="text-start"
+              />
+            </Field>
+          )}
         </div>
       </Card>
 

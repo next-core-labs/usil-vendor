@@ -16,12 +16,14 @@ const ROUTE_FOR: Record<MissingKey, string> = {
 };
 
 /**
- * The pending vendor's to-do list, on every screen: the same items the owner
- * sees, and approval is refused until it is empty.
+ * The vendor's to-do list, on every screen: the same items the owner sees.
+ * Pending until approved; an approved vendor keeps it while the owner let
+ * a short file through, and loses it once the file is complete.
  */
 export function PendingBanner() {
   const { mode, missing } = useAccount();
-  if (mode !== 'pending') return null;
+  const approved = mode === 'vendor';
+  if (mode !== 'pending' && !(approved && missing.length)) return null;
 
   const done = TOTAL_CHECKS - missing.length;
   const complete = missing.length === 0;
@@ -37,12 +39,18 @@ export function PendingBanner() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-ink">
-            {complete ? 'ملفك مكتمل — بانتظار موافقة إدارة يوصل' : 'متجرك قيد المراجعة — أكمل هذي الخطوات'}
+            {complete
+              ? 'ملفك مكتمل — بانتظار موافقة إدارة يوصل'
+              : approved
+                ? 'متجرك معتمد — باقي عليك تكمل هذي المعلومات'
+                : 'متجرك قيد المراجعة — أكمل هذي الخطوات'}
           </p>
           <p className="mt-0.5 text-[13px] leading-6 text-ink-secondary">
             {complete
               ? 'نراجع متجرك ونرسل لك بريداً عند الاعتماد. تقدر تضيف منتجات أكثر وأنت تنتظر.'
-              : 'منتجاتك محفوظة، وتظهر للعملاء بعد موافقة الإدارة. الإدارة ما تقدر تعتمد متجرك قبل اكتمال الملف.'}
+              : approved
+                ? 'اعتمدت إدارة يوصل متجرك قبل اكتمال ملفك. أكمل الناقص عشان نقدر نحوّل لك مستحقاتك ونتحقق من متجرك.'
+                : 'منتجاتك محفوظة، وتظهر للعملاء بعد موافقة الإدارة. أكمل ملفك عشان تسرّع المراجعة.'}
           </p>
         </div>
         <span className="tabular shrink-0 text-xs font-medium text-ink-secondary">

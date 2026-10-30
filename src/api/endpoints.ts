@@ -69,7 +69,7 @@ export const applications = {
    */
   signup: (draft: QuickSignupDraft) =>
     api.post<{ user: PublicUser | null; message?: string }>('/api/vendor-signup', draft),
-  /** Only while the application is pending. */
+  /** The whole file while pending; once approved, only the fields `missing` names (the server drops the rest). */
   saveDetails: (draft: VendorDetailsDraft) =>
     api.put<{ application: VendorApplicationRow; missing: MissingItem[] }>('/api/vendor/application', draft),
 };

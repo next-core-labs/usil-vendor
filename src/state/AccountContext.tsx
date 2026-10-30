@@ -6,7 +6,8 @@ import { usePoll } from '../lib/usePoll.ts';
 import { isVendorAccount, useSession } from './SessionContext.tsx';
 
 /**
- * - `vendor`: an approved vendor (or a supervisor) — the full dashboard.
+ * - `vendor`: an approved vendor (or a supervisor) — the full dashboard, plus
+ *   the checklist when the owner approved a file that is still short.
  * - `pending`: signed up, waiting on the owner — the dashboard minus bookings
  *   and chats, with a checklist of what still blocks approval.
  * - `outside`: any other account — rejected, or never applied.
@@ -32,7 +33,7 @@ function initialSupervised(): SupervisedVendor | null {
 
 type AccountState = {
   mode: AccountMode;
-  /** Null for vendors (not needed) and until the first load. */
+  /** Null for supervisors (not needed) and until the first load. */
   file: VendorFile | null;
   missing: MissingItem[];
   loading: boolean;
@@ -50,6 +51,8 @@ const AccountContext = createContext<AccountState | null>(null);
 
 /** How often a pending vendor's dashboard looks for the owner's decision. */
 const DECISION_POLL_MS = 30_000;
+
+const NO_MISSING: MissingItem[] = [];
 
 export function AccountProvider({ user, children }: { user: PublicUser; children: ReactNode }) {
   const { refresh } = useSession();
@@ -107,8 +110,11 @@ export function AccountProvider({ user, children }: { user: PublicUser; children
   const [loading, setLoading] = useState(!vendor);
   const [error, setError] = useState<string | null>(null);
 
+  // A supervisor's own file is not the vendor they opened.
+  const ownFile = !isSupervisor;
+
   const reload = useCallback(async () => {
-    if (vendor) return;
+    if (!ownFile) return;
     try {
       setFile(await storefront.file());
       setError(null);
@@ -117,16 +123,19 @@ export function AccountProvider({ user, children }: { user: PublicUser; children
     } finally {
       setLoading(false);
     }
-  }, [vendor]);
+  }, [ownFile]);
 
   useEffect(() => {
     void reload();
   }, [reload, user.id]);
 
   const pending = !vendor && file?.application?.status === 'pending';
+  const missing = (pending || (vendor && ownFile)) && file?.missing ? file.missing : NO_MISSING;
 
   // Approval turns this same account into a vendor; a rejection ends the pending
   // state. Either way the session and the file are what change, so re-read both.
+  // An approved vendor with a short file polls too, so the checklist follows
+  // products and socials added on other screens.
   usePoll(
     () => {
       void refresh()
@@ -134,14 +143,14 @@ export function AccountProvider({ user, children }: { user: PublicUser; children
         .catch(() => undefined);
     },
     DECISION_POLL_MS,
-    pending,
+    pending || missing.length > 0,
   );
 
   const value = useMemo<AccountState>(
     () => ({
       mode: isSupervisor && !supervised ? 'pick' : vendor ? 'vendor' : pending ? 'pending' : 'outside',
       file,
-      missing: pending ? file?.missing || [] : [],
+      missing,
       loading,
       error,
       reload,
@@ -150,7 +159,7 @@ export function AccountProvider({ user, children }: { user: PublicUser; children
       chooseVendor,
       leaveVendor,
     }),
-    [vendor, pending, file, loading, error, reload, isSupervisor, supervised, chooseVendor, leaveVendor],
+    [vendor, pending, file, missing, loading, error, reload, isSupervisor, supervised, chooseVendor, leaveVendor],
   );
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

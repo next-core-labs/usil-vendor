@@ -3,10 +3,12 @@ import { ImagePlus, Loader2, X } from 'lucide-react';
 import { uploads } from '../../api/endpoints.ts';
 import { errorText } from '../../api/client.ts';
 import { LISTING_MAX_IMAGES, LISTING_MIN_IMAGES } from '../../lib/labels.ts';
+import { PHOTO_PROBLEM_AR, photoDigest, photoProblem } from '../../lib/photoCheck.ts';
 
 const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 /** `UPLOAD_MAX_BYTES` in `server/auth/avatar.ts`. */
 const MAX_BYTES = 5 * 1024 * 1024;
+const DUPLICATE_AR = 'هذه الصورة مضافة من قبل — اختر صورة مختلفة';
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,6 +35,8 @@ export function ImagesPicker({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Content key per uploaded URL, so the same photo can't fill both required slots. */
+  const digests = useRef(new Map<string, string>());
   const [uploading, setUploading] = useState(0);
   const [error, setError] = useState('');
 
@@ -68,16 +72,50 @@ export function ImagesPicker({
     if (!valid.length) return;
 
     setBusy(valid.length);
+    const taken = await digestsOf(value);
     const saved: string[] = [];
     for (const file of valid) {
       try {
-        saved.push(await uploads.image(await readAsDataUrl(file)));
+        const problem = await photoProblem(file);
+        if (problem) {
+          setError(PHOTO_PROBLEM_AR[problem]);
+          continue;
+        }
+        const digest = await photoDigest(file);
+        if (taken.has(digest)) {
+          setError(DUPLICATE_AR);
+          continue;
+        }
+        const url = await uploads.image(await readAsDataUrl(file));
+        digests.current.set(url, digest);
+        taken.add(digest);
+        saved.push(url);
       } catch (caught) {
         setError(errorText(caught));
       }
     }
     setBusy(0);
     if (saved.length) onChange([...value, ...saved].slice(0, LISTING_MAX_IMAGES));
+  }
+
+  /** Photos already on the listing were uploaded earlier, so fetch them to learn their content. */
+  async function digestsOf(urls: string[]): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (const url of urls) {
+      let digest = digests.current.get(url);
+      if (!digest) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          digest = await photoDigest(await res.blob());
+          digests.current.set(url, digest);
+        } catch {
+          continue;
+        }
+      }
+      out.add(digest);
+    }
+    return out;
   }
 
   const short = value.length < LISTING_MIN_IMAGES;

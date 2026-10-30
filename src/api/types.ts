@@ -181,7 +181,7 @@ export type VendorPublicFile = {
 /** `GET /api/me/vendor-file`. Every field is null before the vendor applies. */
 export type VendorFile = {
   application: VendorApplicationRow | null;
-  /** What still blocks approval; empty unless the application is pending. */
+  /** What the file still lacks, pending or approved; empty once rejected. */
   missing?: MissingItem[];
   profile: VendorOwnProfile | null;
   file: VendorPublicFile | null;
