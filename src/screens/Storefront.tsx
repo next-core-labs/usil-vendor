@@ -15,7 +15,7 @@ import {
   Skeleton,
   type Tone,
 } from '../components/ui/primitives.tsx';
-import type { ApplicationStatus } from '../api/types.ts';
+import type { ApplicationStatus, MissingKey } from '../api/types.ts';
 import { useAccount } from '../state/AccountContext.tsx';
 import { DetailsForm } from '../components/storefront/DetailsForm.tsx';
 import { publicStoreUrl } from '../lib/publicSite.ts';
@@ -39,13 +39,26 @@ function Row({ icon, label, value }: { icon: ReactNode; label: string; value: st
   );
 }
 
+/** Checklist items completed on this screen; socials and products have their own. */
+const FORM_KEYS: ReadonlyArray<MissingKey> = ['names', 'nationalId', 'bank', 'fulfillment'];
+
 export function Storefront() {
   const account = useAccount();
-  if (account.mode === 'pending' && account.file?.application) {
+  const application = account.file?.application;
+  if (account.mode === 'pending' && application) {
     return (
       <>
         <PageHeader title="ملفي التجاري" subtitle="أكمل بيانات متجرك — تراجعها إدارة يوصل قبل الاعتماد." />
-        <DetailsForm application={account.file.application} />
+        <DetailsForm application={application} />
+      </>
+    );
+  }
+  // Approved with a short file: the same form, limited to what is still owed.
+  if (account.mode === 'vendor' && application && account.missing.some((item) => FORM_KEYS.includes(item.key))) {
+    return (
+      <>
+        <PageHeader title="ملفي التجاري" subtitle="متجرك معتمد — أكمل البيانات الناقصة." />
+        <DetailsForm application={application} approved />
       </>
     );
   }
