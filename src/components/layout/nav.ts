@@ -12,6 +12,7 @@ import {
   Share2,
   Store,
   TrendingUp,
+  UsersRound,
   Wallet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -34,6 +35,7 @@ export const NAV: NavGroup[] = [
       { route: 'calendar', label: 'التقويم والحجوزات', icon: CalendarCheck },
       { route: 'contracts', label: 'العقود', icon: FileSignature },
       { route: 'quotations', label: 'عروض الأسعار', icon: FileSpreadsheet },
+      { route: 'clients', label: 'عملائي', icon: UsersRound },
       { route: 'chats', label: 'المحادثات', icon: MessagesSquare, badge: 'chats' },
     ],
   },

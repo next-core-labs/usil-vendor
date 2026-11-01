@@ -19,6 +19,7 @@ import { Orders } from './screens/Orders.tsx';
 import { VendorPicker } from './screens/VendorPicker.tsx';
 import { Contracts } from './screens/Contracts.tsx';
 import { Quotations } from './screens/Quotations.tsx';
+import { Clients } from './screens/Clients.tsx';
 import { Earnings } from './screens/Earnings.tsx';
 import { Invoices } from './screens/Invoices.tsx';
 import { Expenses } from './screens/Expenses.tsx';
@@ -41,6 +42,8 @@ function Screen() {
       return <Contracts />;
     case 'quotations':
       return <Quotations />;
+    case 'clients':
+      return <Clients />;
     case 'earnings':
       return <Earnings />;
     case 'invoices':

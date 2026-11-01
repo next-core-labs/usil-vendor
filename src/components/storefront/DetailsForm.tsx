@@ -64,13 +64,26 @@ const COMPLETION_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof Draft>;
 
 /**
- * A pending vendor's file, editable until the owner decides. Saving partial
+ * A pending vendor's file, editable until the owner decides.
+ * `supervisor`: an admin or accounts manager editing the vendor they opened —
+ * the whole file at any stage, bank details included; `onSaved` refreshes it.
+ * Saving partial
  * data is fine — the banner and the owner both read what is still missing —
  * but every field sent must be valid, and the server says which one is not.
  * `approved`: the owner approved a short file; only the approval fields show,
  * since the brand screen owns the store name and logo by then.
  */
-export function DetailsForm({ application, approved = false }: { application: VendorApplicationRow; approved?: boolean }) {
+export function DetailsForm({
+  application,
+  approved = false,
+  supervisor = false,
+  onSaved,
+}: {
+  application: VendorApplicationRow;
+  approved?: boolean;
+  supervisor?: boolean;
+  onSaved?: () => Promise<void>;
+}) {
   const account = useAccount();
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(application));
@@ -106,8 +119,8 @@ export function DetailsForm({ application, approved = false }: { application: Ve
           : { ...draft, ...(logo ? { logoDataUrl: logo } : {}) },
       );
       setLogo('');
-      await account.reload();
-      toast.success('حُفظ ملفك.');
+      await (onSaved ? onSaved() : account.reload());
+      toast.success(supervisor ? 'حُفظ ملف المورّد.' : 'حُفظ ملفك.');
     } catch (caught) {
       setError(errorText(caught));
     } finally {
@@ -182,7 +195,7 @@ export function DetailsForm({ application, approved = false }: { application: Ve
 
       <Card>
         <CardHeader
-          title="بياناتك"
+          title={supervisor ? 'بيانات المورّد' : 'بياناتك'}
           subtitle={approved ? 'تراها إدارة يوصل فقط، للتحقق من متجرك.' : 'تراها إدارة يوصل فقط، للتحقق قبل الاعتماد.'}
         />
         <div className="grid gap-4 sm:grid-cols-3">
@@ -221,7 +234,14 @@ export function DetailsForm({ application, approved = false }: { application: Ve
       </Card>
 
       <Card>
-        <CardHeader title="الحساب البنكي" subtitle="تُحوَّل مستحقاتك لهذا الحساب." />
+        <CardHeader
+          title="الحساب البنكي"
+          subtitle={
+            supervisor
+              ? 'تُحوَّل مستحقات المورّد لهذا الحساب. يصله إشعار إذا تغيّر الآيبان أو البنك.'
+              : 'تُحوَّل مستحقاتك لهذا الحساب.'
+          }
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="البنك">
             <Select value={draft.bankName} onChange={(e) => set('bankName', e.target.value)}>

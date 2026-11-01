@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import {
+  CreditCard,
   Download,
   FileText,
   MessageCircle,
@@ -26,6 +27,7 @@ import {
   type InvoiceStatus,
   type VendorInvoice,
 } from '../api/invoices.ts';
+import { linkFor, payLinks, withLink, type PayLink } from '../api/payLinks.ts';
 import { useResource } from '../lib/useResource.ts';
 import { navigate } from '../lib/router.ts';
 import { count, sar, shortDate } from '../lib/format.ts';
@@ -47,6 +49,7 @@ import { FilterTabs, Toolbar } from '../components/ui/Table.tsx';
 import { ConfirmDialog, Modal } from '../components/ui/Modal.tsx';
 import { InvoiceFormModal, sar2, type InvoiceDraft } from '../components/invoices/InvoiceFormModal.tsx';
 import { InvoiceView } from '../components/invoices/InvoiceView.tsx';
+import { PayLinkModal } from '../components/payLinks/PayLinkModal.tsx';
 
 const PDF_ERROR = 'تعذّر إنشاء ملف PDF. تحقق من الاتصال ثم حاول مرة أخرى.';
 
@@ -91,6 +94,17 @@ function canShareFiles(): boolean {
   }
 }
 
+/** Store orders were paid at checkout; any other unpaid, issued invoice can be paid by link. */
+function payableByLink(invoice: VendorInvoice): boolean {
+  return (
+    invoice.status !== 'paid' &&
+    invoice.status !== 'draft' &&
+    !invoice.bookingId &&
+    invoice.channelSource !== 'mithyaf' &&
+    invoice.remainingBalance >= 1
+  );
+}
+
 function shareMessage(invoice: VendorInvoice, brand: VendorBrandSettings): string {
   const lines = [
     `مرحباً ${invoice.clientName}،`,
@@ -111,6 +125,9 @@ function shareMessage(invoice: VendorInvoice, brand: VendorBrandSettings): strin
 export function Invoices() {
   const toast = useToast();
   const resource = useResource(loadInvoices);
+  // Links are extra: the screen works without them.
+  const linksRes = useResource(payLinks.list);
+  const [shownLink, setShownLink] = useState<PayLink | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -226,6 +243,19 @@ export function Invoices() {
     }
   }
 
+  async function sendPayLink(invoice: VendorInvoice) {
+    setBusyAction(`link-${invoice.id}`);
+    try {
+      const link = await payLinks.create('invoice', invoice.id);
+      linksRes.set((current) => withLink(current ?? [], link));
+      setShownLink(link);
+    } catch (caught) {
+      toast.failure(errorText(caught));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function runPdf(key: string, task: () => Promise<void>) {
     setBusyAction(key);
     try {
@@ -264,7 +294,7 @@ export function Invoices() {
               variant="ghost"
               busy={resource.refreshing}
               icon={<RefreshCw size={15} />}
-              onClick={() => void resource.reload()}
+              onClick={() => void Promise.all([resource.reload(), linksRes.reload()])}
             >
               تحديث
             </Button>
@@ -382,9 +412,20 @@ export function Invoices() {
                   <>
                     <Card>
                       <div className="flex flex-wrap items-center gap-2">
+                        {payableByLink(selected) ? (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<CreditCard size={15} />}
+                            busy={busyAction === `link-${selected.id}`}
+                            onClick={() => void sendPayLink(selected)}
+                          >
+                            رابط دفع
+                          </Button>
+                        ) : null}
                         <Button
                           size="sm"
-                          variant="primary"
+                          variant={payableByLink(selected) ? 'secondary' : 'primary'}
                           icon={<Download size={15} />}
                           busy={busyAction === `pdf-${selected.id}`}
                           onClick={() =>
@@ -465,6 +506,7 @@ export function Invoices() {
                           onClick={() => setRemoving(selected)}
                         />
                       </div>
+                      <PayLinkNote link={linkFor(linksRes.data ?? [], 'invoice', selected.id)} />
                       {!selected.clientPhone ? (
                         <p className="mt-2 text-xs text-ink-muted">
                           ما فيه جوال للعميل — زر واتساب يفتح الرسالة وتختار المحادثة بنفسك.
@@ -533,6 +575,8 @@ export function Invoices() {
         ) : null}
       </Modal>
 
+      <PayLinkModal link={shownLink} brandName={brand.brandName} onClose={() => setShownLink(null)} />
+
       <ConfirmDialog
         open={!!removing}
         title="حذف الفاتورة؟"
@@ -544,5 +588,17 @@ export function Invoices() {
         onCancel={() => setRemoving(null)}
       />
     </>
+  );
+}
+
+/** Where the invoice's payment link stands, under its actions. */
+function PayLinkNote({ link }: { link: PayLink | null }) {
+  if (!link || (link.status !== 'open' && link.status !== 'paid')) return null;
+  return (
+    <p className="mt-2 text-xs text-ink-secondary">
+      {link.status === 'paid'
+        ? `دفع العميل ${sar2(link.amount)} عبر الرابط${link.paidAt ? ` في ${shortDate(link.paidAt)}` : ''}، والمبلغ في رصيدك.`
+        : `أرسلت رابط دفع بـ ${sar2(link.amount)} — بانتظار دفع العميل. «رابط دفع» يعيد نفس الرابط.`}
+    </p>
   );
 }

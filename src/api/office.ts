@@ -22,7 +22,8 @@ export type OfficeListKey =
   | 'consolidatedVouchers'
   | 'trackings'
   | 'workLogs'
-  | 'attendance';
+  | 'attendance'
+  | 'clients';
 
 export type VendorOffice = Partial<Record<OfficeListKey, unknown[]>> & {
   brandSettings?: Record<string, unknown>;
