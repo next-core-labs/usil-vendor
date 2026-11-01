@@ -41,7 +41,8 @@ export function actingVendor(): string | null {
   return actingVendorId;
 }
 
-const VENDOR_SCOPED = /^\/api\/(vendor\/|bookings(\/|\?|$))/;
+// `me/vendor-file` too: the profile, bank details and checklist are the supervised vendor's, not the supervisor's.
+const VENDOR_SCOPED = /^\/api\/(vendor\/|me\/vendor-file|bookings(\/|\?|$))/;
 
 export function withActingVendor(path: string): string {
   if (!actingVendorId || !VENDOR_SCOPED.test(path)) return path;

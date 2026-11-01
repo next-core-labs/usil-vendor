@@ -13,6 +13,7 @@ import {
   ErrorNote,
   PageHeader,
   Skeleton,
+  TableSkeleton,
   type Tone,
 } from '../components/ui/primitives.tsx';
 import type { ApplicationStatus, MissingKey } from '../api/types.ts';
@@ -45,6 +46,7 @@ const FORM_KEYS: ReadonlyArray<MissingKey> = ['names', 'nationalId', 'bank', 'fu
 export function Storefront() {
   const account = useAccount();
   const application = account.file?.application;
+  if (account.supervised) return <SupervisedStorefront />;
   if (account.mode === 'pending' && application) {
     return (
       <>
@@ -63,6 +65,31 @@ export function Storefront() {
     );
   }
   return <ApprovedStorefront />;
+}
+
+/**
+ * A supervisor in a vendor's dashboard edits the whole file — names, ID,
+ * commercial register, store and bank details — whatever its stage. A vendor
+ * with no application (seeded workspace only) has nothing to edit here.
+ */
+function SupervisedStorefront() {
+  const resource = useResource(storefront.file);
+  const application = resource.data?.application;
+  if (resource.loading) {
+    return (
+      <Card>
+        <TableSkeleton rows={4} />
+      </Card>
+    );
+  }
+  if (!application) return <ApprovedStorefront />;
+  return (
+    <div className="space-y-5">
+      <PageHeader title="ملف المورّد" subtitle="تعدّله كمشرف: البيانات الشخصية والسجل التجاري والمتجر والحساب البنكي." />
+      {resource.error ? <ErrorNote message={resource.error} onRetry={() => void resource.reload()} /> : null}
+      <DetailsForm key={application.id} application={application} supervisor onSaved={resource.reload} />
+    </div>
+  );
 }
 
 /** Read-only once approved: the file is the approved application. */
