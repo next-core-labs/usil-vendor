@@ -21,6 +21,8 @@ export type EarningsOrder = {
   net: number;
   bucket: EarningsBucket;
   refundPending: boolean;
+  /** `link` — an invoice or quotation paid by link; `id` is its number, `status` paid/refunded. */
+  source?: 'store' | 'link';
 };
 
 export type VendorEarnings = {

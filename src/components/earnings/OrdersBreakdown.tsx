@@ -23,9 +23,24 @@ export function OrdersBreakdown({ orders, commissionRate }: { orders: EarningsOr
   const rate = Math.round(commissionRate * 100);
 
   const columns: Column<EarningsOrder>[] = [
-    { key: 'id', header: 'الطلب', render: (row) => <span className="font-medium">{row.id}</span> },
+    {
+      key: 'id',
+      header: 'الطلب',
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-medium">{row.id}</span>
+          {row.source === 'link' ? <Badge>رابط دفع</Badge> : null}
+        </span>
+      ),
+    },
     { key: 'date', header: 'المناسبة', render: (row) => shortDate(row.eventDate) },
-    { key: 'status', header: 'حالة الطلب', render: (row) => bookingStatusLabel(row.status) },
+    {
+      key: 'status',
+      header: 'حالة الطلب',
+      // A link has no event lifecycle: the date is when it was paid.
+      render: (row) =>
+        row.source === 'link' ? (row.status === 'refunded' ? 'مسترد' : 'مدفوع برابط') : bookingStatusLabel(row.status),
+    },
     { key: 'gross', header: 'قيمة طلبك', numeric: true, render: (row) => money(row.gross) },
     { key: 'commission', header: `عمولة يوصل ${rate}٪`, numeric: true, render: (row) => `− ${money(row.commission)}` },
     { key: 'net', header: 'صافي لك', numeric: true, render: (row) => <span className="font-semibold">{money(row.net)}</span> },

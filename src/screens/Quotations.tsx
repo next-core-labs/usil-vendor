@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { CalendarDays, Copy, FileText, MessageCircle, Pencil, Plus, Printer, RefreshCw, Trash2, Users } from 'lucide-react';
+import { CalendarDays, Copy, CreditCard, FileText, MessageCircle, Pencil, Plus, Printer, RefreshCw, Trash2, Users } from 'lucide-react';
 import { Badge, Button, Card, EmptyState, ErrorNote, PageHeader, Select, TableSkeleton, type Tone } from '../components/ui/primitives.tsx';
 import { FilterTabs } from '../components/ui/Table.tsx';
 import { ConfirmDialog } from '../components/ui/Modal.tsx';
 import { PrintSheet } from '../components/finance/PrintSheet.tsx';
 import { QuotationFormModal, type QuotationDraft } from '../components/quotations/QuotationFormModal.tsx';
 import { QuotationPrint } from '../components/quotations/QuotationPrint.tsx';
+import { PayLinkModal } from '../components/payLinks/PayLinkModal.tsx';
 import {
   QUOTATION_STATUSES,
   QUOTATION_STATUS_LABEL,
@@ -20,6 +21,7 @@ import {
 } from '../components/quotations/model.ts';
 import { finance, type BrandInfo } from '../api/finance.ts';
 import { listings as listingsApi } from '../api/endpoints.ts';
+import { linkFor, payLinks, withLink, type PayLink } from '../api/payLinks.ts';
 import { errorText } from '../api/client.ts';
 import { useResource } from '../lib/useResource.ts';
 import { count, sar } from '../lib/format.ts';
@@ -69,6 +71,10 @@ export function Quotations() {
   const [removing, setRemoving] = useState<Quotation | null>(null);
   const [printing, setPrinting] = useState<Quotation | null>(null);
   const [busy, setBusy] = useState(false);
+  // Deposit links are extra: the screen works without them.
+  const linksRes = useResource(() => payLinks.list(), []);
+  const [linking, setLinking] = useState<string | null>(null);
+  const [shownLink, setShownLink] = useState<PayLink | null>(null);
 
   const today = riyadhToday();
   const counts = useMemo(() => {
@@ -174,6 +180,19 @@ export function Quotations() {
     if (row.status === 'draft') setStatus(row, 'sent');
   };
 
+  const sendDepositLink = async (row: Quotation) => {
+    setLinking(row.id);
+    try {
+      const link = await payLinks.create('quotation', row.id);
+      linksRes.set((current) => withLink(current ?? [], link));
+      setShownLink(link);
+    } catch (caught) {
+      toast.failure(errorText(caught));
+    } finally {
+      setLinking(null);
+    }
+  };
+
   const remove = async () => {
     if (!removing) return;
     const target = removing;
@@ -194,7 +213,7 @@ export function Quotations() {
         subtitle="جهّز عرض سعر للشركات والعملاء، وأرسله بواتساب أو اطبعه PDF."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" icon={<RefreshCw size={15} />} busy={officeRes.refreshing} onClick={() => void officeRes.reload()}>
+            <Button size="sm" icon={<RefreshCw size={15} />} busy={officeRes.refreshing} onClick={() => void Promise.all([officeRes.reload(), linksRes.reload()])}>
               تحديث
             </Button>
             <Button size="sm" variant="primary" icon={<Plus size={15} />} onClick={openNew}>
@@ -242,6 +261,8 @@ export function Quotations() {
         <ul className="grid gap-3">
           {visible.map((row) => {
             const status = effectiveStatus(row, today);
+            const link = linkFor(linksRes.data ?? [], 'quotation', row.id);
+            const depositPaid = link?.status === 'paid';
             return (
               <li key={row.id}>
                 <Card className="space-y-3">
@@ -253,6 +274,7 @@ export function Quotations() {
                         </span>
                         <Badge tone={STATUS_TONE[status]}>{QUOTATION_STATUS_LABEL[status]}</Badge>
                         {row.companyName ? <Badge tone="accent">{row.companyName}</Badge> : null}
+                        {depositPaid ? <Badge tone="good">العربون مدفوع</Badge> : link?.status === 'open' ? <Badge tone="warning">رابط العربون أُرسل</Badge> : null}
                       </div>
                       <h3 className="mt-1 text-sm font-semibold text-ink">{row.eventTitle || 'عرض سعر'}</h3>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-secondary">
@@ -322,6 +344,17 @@ export function Quotations() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
+                      {row.depositRequired >= 1 && status !== 'rejected' && !depositPaid ? (
+                        <Button
+                          size="sm"
+                          icon={<CreditCard size={15} />}
+                          busy={linking === row.id}
+                          title={`رابط دفع العربون ${sar(row.depositRequired)} عبر ميسر`}
+                          onClick={() => void sendDepositLink(row)}
+                        >
+                          رابط العربون
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="primary"
@@ -386,6 +419,8 @@ export function Quotations() {
         onConfirm={() => void remove()}
         onCancel={() => (busy ? undefined : setRemoving(null))}
       />
+
+      <PayLinkModal link={shownLink} brandName={brand.brandName} onClose={() => setShownLink(null)} />
 
       {printing ? (
         <PrintSheet onDone={stopPrinting}>
