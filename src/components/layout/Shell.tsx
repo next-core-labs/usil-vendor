@@ -11,6 +11,7 @@ import { ROLE_LABEL } from '../../lib/labels.ts';
 import { count, initials } from '../../lib/format.ts';
 import { useUnread } from '../../state/UnreadContext.tsx';
 import { Button } from '../ui/primitives.tsx';
+import { PushToggle } from './PushToggle.tsx';
 import { UsilMark } from '../ui/UsilMark.tsx';
 
 const THEMES: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
@@ -185,6 +186,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 initials(user?.name || '')
               )}
             </span>
+            <PushToggle />
             <Button
               variant="ghost"
               size="sm"

@@ -13,6 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "firebase": "^11.10.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.9",
