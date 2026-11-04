@@ -79,6 +79,14 @@ export const workspace = {
   summary: () => api.get<Wrapped<VendorSummary>>('/api/vendor/summary').then((r) => r.data),
 };
 
+/** «التصنيفات» — the owner's live list (backend: server/catalog/category-store.ts). */
+export const categories = {
+  list: () =>
+    api
+      .get<Wrapped<{ categories: Array<{ id: string; name: string }> }>>('/api/categories')
+      .then((r) => r.data.categories.map(({ id, name }) => ({ id, name }))),
+};
+
 export const listings = {
   list: () => api.get<Listed<VendorListing>>('/api/vendor/listings').then((r) => r.data),
   create: (input: ListingDraft) =>

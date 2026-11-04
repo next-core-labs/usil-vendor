@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { auth } from '../api/endpoints.ts';
+import { disablePush } from '../lib/push.ts';
 import { errorText } from '../api/client.ts';
 import type { PublicUser } from '../api/types.ts';
 
@@ -63,6 +64,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
+      // This browser stops hearing for the account before the session is gone.
+      await disablePush();
       await auth.logout();
     } finally {
       // Whatever the server said, this browser is done with the session.
