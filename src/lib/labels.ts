@@ -51,6 +51,7 @@ export const BOOKING_MODE_HINT: Record<BookingMode, string> = {
 
 export const PRICE_UNITS: PriceUnit[] = ['للمناسبة', 'للساعة', 'للشخص', 'لليوم', 'للوحدة'];
 
+/** The design's categories — shown until the owner's live list (`categories.list()`) loads. */
 export const CATEGORIES: Array<{ id: string; name: string }> = [
   { id: 'hospitality', name: 'ضيافة وقهوة' },
   { id: 'buffet', name: 'بوفيه ومأكولات' },

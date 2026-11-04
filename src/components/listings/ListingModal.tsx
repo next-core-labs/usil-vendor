@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { categories as categoriesApi } from '../../api/endpoints.ts';
+import { useResource } from '../../lib/useResource.ts';
 import { Modal } from '../ui/Modal.tsx';
 import { Button, Field, Input, Select, Textarea } from '../ui/primitives.tsx';
 import { useAccount } from '../../state/AccountContext.tsx';
@@ -61,6 +63,14 @@ export function ListingModal({
   const { mode } = useAccount();
   const [draft, setDraft] = useState<ListingDraft>(() => draftFrom(listing));
   const [uploading, setUploading] = useState(false);
+  const liveCategories = useResource(() => categoriesApi.list(), []);
+  // A product may sit in a category the owner has since removed: keep it pickable
+  // so an unrelated edit still saves, and say so.
+  const categoryOptions = useMemo(() => {
+    const options = liveCategories.data?.length ? liveCategories.data : CATEGORIES;
+    if (!listing?.category || options.some((item) => item.id === listing.category)) return options;
+    return [...options, { id: listing.category, name: `${listing.categoryName || listing.category} (لم يعد متاحاً)` }];
+  }, [liveCategories.data, listing]);
 
   // Reopening for a different row must not show the previous one's values.
   useEffect(() => {
@@ -123,7 +133,7 @@ export function ListingModal({
       <Field label="القسم">
         <Select value={draft.category} onChange={(event) => patch({ category: event.target.value })}>
           <option value="">اختر قسماً…</option>
-          {CATEGORIES.map((category) => (
+          {categoryOptions.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
             </option>
