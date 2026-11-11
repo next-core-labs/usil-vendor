@@ -4,20 +4,12 @@ import { uploads } from '../../api/endpoints.ts';
 import { errorText } from '../../api/client.ts';
 import { LISTING_MAX_IMAGES, LISTING_MIN_IMAGES } from '../../lib/labels.ts';
 import { PHOTO_PROBLEM_AR, photoDigest, photoProblem } from '../../lib/photoCheck.ts';
+import { fileToDataUrl } from '../../lib/dataUrl.ts';
 
 const ACCEPTED = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 /** `UPLOAD_MAX_BYTES` in `server/auth/avatar.ts`. */
 const MAX_BYTES = 5 * 1024 * 1024;
 const DUPLICATE_AR = 'هذه الصورة مضافة من قبل — اختر صورة مختلفة';
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('تعذر قراءة الصورة'));
-    reader.readAsDataURL(file);
-  });
-}
 
 /**
  * Photos are uploaded the moment they are picked, not when the form is
@@ -86,7 +78,7 @@ export function ImagesPicker({
           setError(DUPLICATE_AR);
           continue;
         }
-        const url = await uploads.image(await readAsDataUrl(file));
+        const url = await uploads.image(await fileToDataUrl(file));
         digests.current.set(url, digest);
         taken.add(digest);
         saved.push(url);

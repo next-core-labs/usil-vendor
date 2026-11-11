@@ -13,6 +13,7 @@ import {
   SAUDI_BANKS,
 } from '../../lib/labels.ts';
 import { Button, Card, CardHeader, Field, Input, Select } from '../ui/primitives.tsx';
+import { fileToDataUrl } from '../../lib/dataUrl.ts';
 
 /** `AVATAR_MAX_BYTES` in `server/auth/avatar.ts`. */
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -103,9 +104,9 @@ export function DetailsForm({
       setError('ارفع شعاراً jpg أو png أو webp حتى 2 ميغابايت.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setLogo(String(reader.result || ''));
-    reader.readAsDataURL(file);
+    fileToDataUrl(file)
+      .then(setLogo)
+      .catch(() => setError('تعذرت قراءة الشعار — جرّب صورة أخرى.'));
   }
 
   async function onSubmit(event: FormEvent) {

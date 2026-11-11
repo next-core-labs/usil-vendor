@@ -1,6 +1,7 @@
 import { api } from './client.ts';
 import { office } from './office.ts';
 import type { VendorFile } from './types.ts';
+import { fileToDataUrl } from '../lib/dataUrl.ts';
 
 /**
  * «الهوية والفواتير» — the vendor's invoice branding, kept in the back office
@@ -200,15 +201,6 @@ export function mobileProblem(raw: string): string {
 export const BRAND_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 export const BRAND_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('تعذر قراءة الصورة.'));
-    reader.readAsDataURL(file);
-  });
-}
-
 export const brand = {
   read: () => office.read().then((data) => data.brandSettings),
   save: (settings: VendorBrandSettings) =>
@@ -224,7 +216,7 @@ export const brand = {
   uploadImage: async (file: File, purpose: 'logo' | 'stamp'): Promise<string> => {
     if (!BRAND_IMAGE_TYPES.includes(file.type)) throw new Error('الصيغ المقبولة: JPG أو PNG أو WEBP.');
     if (file.size > BRAND_IMAGE_MAX_BYTES) throw new Error('حجم الصورة أكبر من 5 ميجابايت.');
-    const dataUrl = await readAsDataUrl(file);
+    const dataUrl = await fileToDataUrl(file);
     const body = await api.post<{ url?: string }>('/api/uploads', {
       purpose: purpose === 'logo' ? 'logo' : 'upload',
       dataUrl,
